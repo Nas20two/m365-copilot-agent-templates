@@ -1,0 +1,90 @@
+# Generic M365 Copilot Declarative Agent — Copilot Studio Export
+# Template: cliagent-1.0.0
+# Instructions: Replace all <PLACEHOLDER> values before import
+
+kind: BotDefinition
+components:
+  - kind: BotSettingsComponent
+    settings:
+      kind: DefaultFeedbackCollection
+
+  - kind: KnowledgeSourceComponent
+    displayName: <KNOWLEDGE_SOURCE_NAME>
+    description: This knowledge source provides information from the <COMPANY> <TEAM> SharePoint.
+    configuration:
+      kind: KnowledgeSourceConfiguration
+      source:
+        kind: SharePointKnowledgeSource
+        siteUrl: <SHAREPOINT_SITE_URL>
+        targetKind: Site
+
+entity:
+  kind: BotEntity
+  displayName: <AGENT_NAME>
+  teamsAppInformation:
+    kind: ApplicationDetails
+    teams:
+      kind: TeamsApplicationDetails
+      lobDisplayName: <AGENT_NAME>
+      shortDescription: <SHORT_DESCRIPTION_140_CHARS>
+      longDescription: Help <TEAM> stay informed and productive with AI agents grounded in <COMPANY> knowledge. Built using Microsoft Copilot Studio.
+      accentColor: "<HEX_COLOR>"  # e.g. "#07687d"
+
+  configuration:
+    kind: BotConfiguration
+    channels:
+      - kind: ChannelDefinition
+        id: Microsoft365Copilot
+        channelId: Microsoft365Copilot
+      - kind: ChannelDefinition
+        id: MsTeams
+        channelId: MsTeams
+    recognizer:
+      kind: CLICopilotRecognizer
+    agentSettings:
+      kind: AgentSettings
+      version: "1.0"
+      model:
+        series: claude-opus-5
+      instructions:
+        segments:
+          - kind: StaticSegment
+            value: |-
+              # Purpose
+              <AGENT_PURPOSE>
+
+              # General Guidelines
+              - Use **only connected knowledge sources** to answer.
+              - Do not use general knowledge, assumptions, memory, or unsupported inference.
+              - Keep answers concise and easy to scan during a live <TEAM> interaction.
+              - Cite the source document for every substantive answer, using the document title and a link when available.
+              - Never state, estimate, or imply commercial terms unless the exact amounts and conditions are verified in a connected source.
+              - If sources conflict, explain the conflict briefly, cite both sources, and recommend confirming with the document owner.
+              - Respect existing security permissions — do not reveal information the user should not see.
+
+              # Skills
+              <SKILL_SECTIONS>
+
+              # Step-by-Step Instructions
+              <STEP_BY_STEP>
+
+              # Error Handling and Limitations
+              - If the answer is not present in connected sources, say exactly: **"I can't find that in our documentation yet."**
+              - Then suggest the specific item to look up.
+              - If the question is ambiguous, ask one focused question before searching further.
+              - If documentation appears outdated, state that clearly and recommend checking the latest approved source.
+
+              # Response Format
+              - **Answer:** concise, verified response.
+              - **Source:** document title and link.
+
+      enableMemory: true
+      web:
+        kind: WebSettings
+        enableWebSearch: false
+
+  publishedOn: <PUBLISHED_DATE>  # e.g. 2026-08-31T00:00:00Z
+  synchronizationStatus:
+    kind: BotSynchronizationDetails
+    contentVersion: 2
+  template: cliagent-1.0.0

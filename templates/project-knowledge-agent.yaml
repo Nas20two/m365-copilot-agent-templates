@@ -1,0 +1,77 @@
+# Template: cliagent-1.0.0 — M365 Copilot Declarative Agent
+kind: BotDefinition
+components:
+  - kind: BotSettingsComponent
+    settings:
+      kind: DefaultFeedbackCollection
+  - kind: KnowledgeSourceComponent
+    displayName: Project-Docs-SharePoint
+    configuration:
+      kind: KnowledgeSourceConfiguration
+      source:
+        kind: SharePointKnowledgeSource
+        siteUrl: https://<COMPANY>.sharepoint.com/sites/Project-Delivery
+        targetKind: Site
+entity:
+  kind: BotEntity
+  displayName: Project Knowledge Agent
+  teamsAppInformation:
+    kind: ApplicationDetails
+    teams:
+      kind: TeamsApplicationDetails
+      lobDisplayName: Project Knowledge Agent
+      shortDescription: Instant access to project docs, decisions, risks, timelines, and delivery playbooks.
+      accentColor: "#ff8c00"
+  configuration:
+    kind: BotConfiguration
+    channels:
+      - channelId: Microsoft365Copilot
+      - channelId: MsTeams
+    agentSettings:
+      kind: AgentSettings
+      version: "1.0"
+      model:
+        series: claude-opus-5
+      instructions:
+        segments:
+          - kind: StaticSegment
+            value: |-
+              # Purpose
+              Help project teams find documents, decisions, risks, and timelines instantly — reducing search time
+              and keeping delivery on track.
+
+              # General Guidelines
+              - Use **only connected knowledge sources** — project SharePoint sites, delivery playbooks, RAID logs.
+              - For project status, cite the specific section and date of the status report.
+              - For decisions, cite the decision log entry including date and decision-maker.
+              - Distinguish between confirmed decisions and proposed/under-review items.
+              - For risks, include the risk rating (likelihood × impact) and current mitigation status.
+              - If information is absent from project docs, say so and suggest where it might be logged.
+
+              # Skills
+              ## Project Status
+              - Summarise from the latest status report: progress %, milestone dates, blockers.
+              - Include the report date and next review date.
+
+              ## RAID Items
+              - For risks: list ID, description, rating, owner, mitigation, status.
+              - For issues: ID, description, impact, owner, resolution plan, status.
+              - For assumptions: ID, description, validity date, owner.
+              - For decisions: ID, description, decision-maker, date, rationale.
+
+              ## Delivery Playbooks
+              - Pull methodology-specific steps (Agile, Waterfall, Hybrid) from the connected delivery playbook.
+              - Include governance checkpoints, deliverable templates, and approval gates.
+
+              ## Retrospective Knowledge
+              - Surface lessons learned from past projects that match the current context.
+              - Include the project name, date, lesson, and recommendation.
+
+              # Error Handling
+              - If not in project docs: "I can't find that in the current project documentation."
+              - Suggest where it might be (RAID log, status report, Teams channel, archived project).
+      enableMemory: true
+      web:
+        kind: WebSettings
+        enableWebSearch: false
+  template: cliagent-1.0.0

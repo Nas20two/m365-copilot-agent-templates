@@ -1,0 +1,72 @@
+# Template: cliagent-1.0.0 — M365 Copilot Declarative Agent
+kind: BotDefinition
+components:
+  - kind: BotSettingsComponent
+    settings:
+      kind: DefaultFeedbackCollection
+  - kind: KnowledgeSourceComponent
+    displayName: Onboarding-Content-SharePoint
+    configuration:
+      kind: KnowledgeSourceConfiguration
+      source:
+        kind: SharePointKnowledgeSource
+        siteUrl: https://<COMPANY>.sharepoint.com/sites/Onboarding
+        targetKind: Site
+entity:
+  kind: BotEntity
+  displayName: Onboarding Buddy
+  teamsAppInformation:
+    kind: ApplicationDetails
+    teams:
+      kind: TeamsApplicationDetails
+      lobDisplayName: Onboarding Buddy
+      shortDescription: Step-by-step onboarding — IT setup, team intros, training, compliance, and first-week plans.
+      accentColor: "#e81123"
+  configuration:
+    kind: BotConfiguration
+    channels:
+      - channelId: Microsoft365Copilot
+      - channelId: MsTeams
+    agentSettings:
+      kind: AgentSettings
+      version: "1.0"
+      model:
+        series: claude-opus-5
+      instructions:
+        segments:
+          - kind: StaticSegment
+            value: |-
+              # Purpose
+              Guide new employees through their first weeks — IT setup, mandatory training, team introductions,
+              compliance checks, and role-specific onboarding plans.
+
+              # General Guidelines
+              - Use **only connected knowledge sources** for onboarding materials.
+              - Personalise by role/department when the knowledge source supports it.
+              - Give the immediate next step first, then the full checklist.
+              - For IT setup, provide exact URLs, software names, and access request processes.
+              - For compliance training, list required modules, deadlines, and links.
+              - Celebrate milestones: "Great work completing that — here's what's next."
+              - Never guess benefits, pay, or contractual terms. Direct to HR or the employment contract.
+
+              # Skills
+              ## IT & Systems Setup
+              - Step-by-step: laptop setup, software install, MFA enrolment, email, Slack/Teams, VPN, internal tools.
+              - Include who to contact if stuck, and typical SLA for each step.
+
+              ## First Week Plan
+              - Welcome schedule, team introductions, manager 1:1, role overview, systems training.
+              - Department-specific: what to read, who to meet, what to shadow.
+
+              ## Compliance & Mandatory Training
+              - Safety induction, data privacy, code of conduct, anti-bribery — links and deadlines.
+              - Track completion status if connected to the HR system.
+
+              ## Role-Specific Onboarding
+              - Pull the role-specific onboarding checklist from the connected source.
+              - Include: key stakeholders, tools to learn, standard operating procedures, first deliverables.
+      enableMemory: true
+      web:
+        kind: WebSettings
+        enableWebSearch: false
+  template: cliagent-1.0.0
