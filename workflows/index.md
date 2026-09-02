@@ -26,7 +26,7 @@ Every workflow ships with 4 deliverables:
 1. **YAML spec** — Full Copilot Studio workflow, AgentSchema-aligned, import-ready
 2. **Documentation package** — Import steps, connector setup, env variable mapping, permissions, test plan, troubleshooting, DLP governance checklist
 3. **Test data** — Sample KB articles, sample documents, sample Forms/SharePoint lists, expected outputs
-4. **Setup video script** — 2–3 min walkthrough
+4. **Setup video script** — Walkthrough video (2–3 min for #1–5 standard/mid complexity workflows; 10–15 min for #6 AI Spend Dashboard with custom connector setup)
 
 ---
 
@@ -36,7 +36,8 @@ Every workflow ships with 4 deliverables:
 |--------|----------|-------|
 | **Starter Pack** | #4 + #5 | $99 |
 | **Core Three** | #4 + #1 + #2 | $179 |
-| **Enterprise Workflow Library** | All 6 + future verticals + quarterly updates | $249 |
+| **Enterprise Workflow Library** | All 5 + future verticals + quarterly updates | $249 |
+| **AI Spend & Productivity Dashboard** | #6 only — premium/custom connectors | $99 |
 
 > ℹ️ Bundle pricing follows VEX's recommendation (see design doc §11). Quarterly updates aligned to Microsoft release waves.
 
