@@ -15,6 +15,7 @@
 | 03 | **HR Onboarding Automation** | $79 | `onboarding-buddy-agent.yaml` + `hr-policy-agent.yaml` | Advanced | Fourth |
 | 04 | **Email Triage & Daily Digest** | $29–$49 | All agents (standalone) | Standard | 🥇 First |
 | 05 | **Compliance Document Validation** | $79–$99 | `legal-compliance-agent.yaml` | Advanced | Fifth |
+| 06 | **AI Spend & Productivity Dashboard** | $99 | `agent-cost-intelligence` (nasyhub) | Advanced | Sixth |
 
 ---
 
@@ -35,7 +36,7 @@ Every workflow ships with 4 deliverables:
 |--------|----------|-------|
 | **Starter Pack** | #4 + #5 | $99 |
 | **Core Three** | #4 + #1 + #2 | $179 |
-| **Enterprise Workflow Library** | All 5 + future verticals + quarterly updates | $249 |
+| **Enterprise Workflow Library** | All 6 + future verticals + quarterly updates | $249 |
 
 > ℹ️ Bundle pricing follows VEX's recommendation (see design doc §11). Quarterly updates aligned to Microsoft release waves.
 
@@ -50,6 +51,7 @@ Every workflow ships with 4 deliverables:
 | `onboarding-buddy-agent.yaml` | #3 HR Onboarding | Welcome → automated tasks |
 | `hr-policy-agent.yaml` | #3 HR Onboarding | Policy answers + benefits Q&A |
 | All agents | #4 Email Triage | Inbox-to-agent pipeline |
+| `agent-cost-intelligence` | #6 AI Spend Dashboard | AI cost visibility → monthly report |
 
 ---
 
@@ -68,7 +70,7 @@ See individual workflow READMEs for per-workbook requirements.
 ## Distribution
 
 - **GitHub:** [Repo root](../README.md) — free starter workflow (#1), docs, test data
-- **Gumroad:** 8 SKUs (5 individual + 3 bundles) — corporate invoice support
+- **Gumroad:** 9 SKUs (6 individual + 3 bundles) — corporate invoice support
 - **Microsoft AppSource:** Phase 3+ (gated at $1K MRR)
 
 ---
