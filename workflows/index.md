@@ -8,13 +8,13 @@
 
 ## Workflow Catalog
 
-| # | Workflow | Price | Pairs With | Complexity | Build Order |
-|---|----------|-------|------------|------------|-------------|
-| 1 | **Email Triage & Daily Digest** | $29–$49 | All agents (standalone) | Standard | 🥇 First |
-| 2 | **Document Approval — AI Pre-check + Human Sign-off** | $79 | `legal-compliance-agent.yaml` | Advanced | 🥈 Second |
-| 3 | **IT Ticket Triage & Escalation** | $49 | `it-helpdesk-agent.yaml` | Mid | Third |
-| 4 | **HR Onboarding Automation** | $79 | `onboarding-buddy-agent.yaml` + `hr-policy-agent.yaml` | Advanced | Fourth |
-| 5 | **Compliance Document Validation** | $79–$99 | `legal-compliance-agent.yaml` | Advanced | Fifth |
+| ID | Workflow | Price | Pairs With | Complexity | Build Order |
+|----|----------|-------|------------|------------|-------------|
+| 01 | **Document Approval — AI Pre-check + Human Sign-off** | $79 | `legal-compliance-agent.yaml` | Advanced | 🥈 Second |
+| 02 | **IT Ticket Triage & Escalation** | $49 | `it-helpdesk-agent.yaml` | Mid | Third |
+| 03 | **HR Onboarding Automation** | $79 | `onboarding-buddy-agent.yaml` + `hr-policy-agent.yaml` | Advanced | Fourth |
+| 04 | **Email Triage & Daily Digest** | $29–$49 | All agents (standalone) | Standard | 🥇 First |
+| 05 | **Compliance Document Validation** | $79–$99 | `legal-compliance-agent.yaml` | Advanced | Fifth |
 
 ---
 
@@ -33,8 +33,8 @@ Every workflow ships with 4 deliverables:
 
 | Bundle | Contents | Price |
 |--------|----------|-------|
-| **Starter Pack** | #1 + #5 | $99 |
-| **Core Three** | #1 + #2 + #3 | $179 |
+| **Starter Pack** | #4 + #5 | $99 |
+| **Core Three** | #4 + #1 + #2 | $179 |
 | **Enterprise Workflow Library** | All 5 + future verticals + quarterly updates | $249 |
 
 > ℹ️ Bundle pricing follows VEX's recommendation (see design doc §11). Quarterly updates aligned to Microsoft release waves.
@@ -45,11 +45,11 @@ Every workflow ships with 4 deliverables:
 
 | Agent Template | Paired Workflow(s) | Cross-sell angle |
 |----------------|-------------------|-----------------|
-| `legal-compliance-agent.yaml` | #2 Document Approval + #5 Compliance Validation | Ask an agent, execute a workflow |
-| `it-helpdesk-agent.yaml` | #3 IT Ticket Triage | Chat → auto-ticket |
-| `onboarding-buddy-agent.yaml` | #4 HR Onboarding | Welcome → automated tasks |
-| `hr-policy-agent.yaml` | #4 HR Onboarding | Policy answers + benefits Q&A |
-| All agents | #1 Email Triage | Inbox-to-agent pipeline |
+| `legal-compliance-agent.yaml` | #1 Document Approval + #5 Compliance Validation | Ask an agent, execute a workflow |
+| `it-helpdesk-agent.yaml` | #2 IT Ticket Triage | Chat → auto-ticket |
+| `onboarding-buddy-agent.yaml` | #3 HR Onboarding | Welcome → automated tasks |
+| `hr-policy-agent.yaml` | #3 HR Onboarding | Policy answers + benefits Q&A |
+| All agents | #4 Email Triage | Inbox-to-agent pipeline |
 
 ---
 

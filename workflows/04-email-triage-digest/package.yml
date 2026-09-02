@@ -1,0 +1,69 @@
+workflow:
+  number: 04
+  slug: email-triage-digest
+  display_name: "Email Triage & Daily Digest"
+  price: 49
+  complexity: standard
+  pairs_with: []
+  min_copilot_studio_version: "2026.08"
+  standard_connectors: [sharepoint, outlook, teams]
+  uses_ai_approval: false
+  uses_premium_connectors: false
+
+deliverables:
+  workflow_zip:
+    source: src/workflow/export.zip
+    output: deliverables/04-email-triage-digest-workflow.zip
+  agent_yaml:
+    source: src/agent/paired-agent.yaml
+    output: deliverables/04-email-triage-digest-agent.yaml
+  setup_guide:
+    source: src/docs/04-email-triage-digest-setup-guide.md
+    output: deliverables/04-email-triage-digest-setup-guide.md
+  test_data:
+    source: src/test-data/email-test-data/
+    output: deliverables/04-email-triage-digest-test-data/
+  video_script:
+    source: src/video/script.md
+    output: deliverables/04-email-triage-digest-video-script.md
+
+versioning:
+  current: 1.0.0
+  changelog_entry: "Initial release"
+
+env_vars:
+  - name: triage_MailboxAddress
+    description: "Exchange Online mailbox monitored for incoming email"
+    example: "shared@contoso.onmicrosoft.com"
+  - name: triage_AttachmentSiteUrl
+    description: "SharePoint site containing the attachments document library"
+    example: "https://contoso.sharepoint.com/sites/EmailTriage"
+  - name: triage_AttachmentLibraryName
+    description: "Document library where email attachments are saved"
+    example: "Filed Attachments"
+  - name: triage_TeamsTeamId
+    description: "Microsoft Teams team ID containing the notification channel"
+    example: "<TEAMS_TEAM_ID>"
+  - name: triage_TeamsChannelId
+    description: "Teams channel where urgent items are posted"
+    example: "<TEAMS_CHANNEL_ID>"
+  - name: triage_DigestListName
+    description: "SharePoint list where triage entries are logged for digest generation"
+    example: "Daily Digest Log"
+  - name: triage_UrgencyAssigneeEmail
+    description: "Email address notified for Critical/High items"
+    example: "ops@contoso.com"
+  - name: triage_DigestTimeUtc
+    description: "Time of day to send the daily digest (HH:mm, UTC)"
+    example: "18:00"
+  - name: triage_SummaryWordLimit
+    description: "Target word count for thread summaries"
+    example: "75"
+  - name: triage_BodyLengthThreshold
+    description: "Minimum body character count before the summarizer runs"
+    example: "300"
+
+bundle_memberships:
+  - starter-pack: true
+  - core-three: true
+  - enterprise: true

@@ -1,0 +1,66 @@
+workflow:
+  number: 01
+  slug: document-approval
+  display_name: "Document Approval — AI Pre-check + Human Sign-off"
+  price: 79
+  complexity: advanced
+  pairs_with: [legal-compliance-agent]
+  min_copilot_studio_version: "2026.08"
+  standard_connectors: [sharepoint, outlook, teams]
+  uses_ai_approval: true
+  uses_premium_connectors: false
+
+deliverables:
+  workflow_zip:
+    source: src/workflow/export.zip
+    output: deliverables/01-document-approval-workflow.zip
+  agent_yaml:
+    source: src/agent/paired-agent.yaml
+    output: deliverables/01-document-approval-agent.yaml
+  setup_guide:
+    source: src/docs/01-document-approval-setup-guide.md
+    output: deliverables/01-document-approval-setup-guide.md
+  test_data:
+    source: src/test-data/document-test-data/
+    output: deliverables/01-document-approval-test-data/
+  video_script:
+    source: src/video/script.md
+    output: deliverables/01-document-approval-video-script.md
+
+versioning:
+  current: 1.0.0
+  changelog_entry: "Initial release"
+
+env_vars:
+  - name: docapproval_ThresholdLow
+    description: "Amount below which routine items may be AI-approved"
+    example: "500"
+  - name: docapproval_ThresholdHigh
+    description: "Amount above which human review is always required"
+    example: "5000"
+  - name: docapproval_DefaultCurrency
+    description: "Currency code used when the document does not specify one"
+    example: "USD"
+  - name: docapproval_AuditSiteUrl
+    description: "SharePoint site containing the document audit log list"
+    example: "https://contoso.sharepoint.com/sites/Legal-Compliance"
+  - name: docapproval_AuditListName
+    description: "SharePoint list where every approval outcome is written"
+    example: "Document Approval Audit Log"
+  - name: docapproval_ApproverEmail
+    description: "Default human approver or approver group email"
+    example: "approvals@contoso.com"
+  - name: docapproval_TeamsTeamId
+    description: "Microsoft Teams team ID containing the approval channel"
+    example: "<TEAMS_TEAM_ID>"
+  - name: docapproval_TeamsChannelId
+    description: "Teams channel for adaptive-card approval requests"
+    example: "<TEAMS_CHANNEL_ID>"
+  - name: docapproval_DocumentLibraryPath
+    description: "SharePoint document library monitored for new files"
+    example: "/sites/Legal-Compliance/DocumentLibrary"
+
+bundle_memberships:
+  - starter-pack: false
+  - core-three: true
+  - enterprise: true
