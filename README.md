@@ -40,6 +40,8 @@ Each workflow ships with: YAML spec, setup guide, test data, and a walkthrough v
 | Auditing docs against compliance rules | Validates, flags violations, tracks remediation | **$79–$99** vs. fine risk |
 | Guessing at AI token spend | Real-time dashboard + cost tracking + budget alerts | **$99** vs. surprise bills |
 
+### Workflow Catalog
+
 | # | Workflow | Price | Pairs With | Complexity |
 |---|----------|-------|------------|------------|
 | 1 | **Document Approval — AI Pre-check + Human Sign-off** | $79 | `legal-compliance-agent.yaml` | Advanced |
