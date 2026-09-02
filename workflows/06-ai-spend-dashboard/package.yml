@@ -1,0 +1,66 @@
+workflow:
+  number: 06
+  slug: ai-spend-dashboard
+  display_name: "AI Spend & Productivity Dashboard"
+  price: 99
+  complexity: advanced
+  pairs_with: [agent-cost-intelligence]
+  min_copilot_studio_version: "2026.08"
+  standard_connectors: [http, sharepoint, outlook, teams]
+  uses_ai_approval: false
+  uses_premium_connectors: false
+
+deliverables:
+  workflow_zip:
+    source: src/workflow/export.zip
+    output: deliverables/06-ai-spend-dashboard-workflow.zip
+  agent_yaml:
+    source: src/agent/paired-agent.yaml
+    output: deliverables/06-ai-spend-dashboard-agent.yaml
+  setup_guide:
+    source: src/docs/06-ai-spend-dashboard-setup-guide.md
+    output: deliverables/06-ai-spend-dashboard-setup-guide.md
+  test_data:
+    source: src/test-data/spend-test-data/
+    output: deliverables/06-ai-spend-dashboard-test-data/
+  video_script:
+    source: src/video/script.md
+    output: deliverables/06-ai-spend-dashboard-video-script.md
+
+versioning:
+  current: 1.0.0
+  changelog_entry: "Initial release"
+
+env_vars:
+  - name: spend_CardApiUrl
+    description: "Corporate card API endpoint for transaction data"
+    example: "https://api.corpcard.com/v1/transactions"
+  - name: spend_MonthlyCopilotReportUrl
+    description: "M365 Graph API endpoint for Copilot usage data"
+    example: "https://graph.microsoft.com/v1.0/reports/monthly/copilotUsage"
+  - name: spend_OutlierThresholdPerUser
+    description: "Spend per user above which a team is flagged, in USD"
+    example: "500"
+  - name: spend_DashboardSiteUrl
+    description: "SharePoint site containing the AI Spend Dashboard list"
+    example: "https://contoso.sharepoint.com/sites/Finance"
+  - name: spend_DashboardListName
+    description: "SharePoint list name for the spend dashboard (Power BI source)"
+    example: "AI Spend Dashboard"
+  - name: spend_ExecTeamId
+    description: "Microsoft Teams team ID for executive summary cards"
+    example: "<TEAMS_TEAM_ID>"
+  - name: spend_ExecChannelId
+    description: "Teams channel ID for executive summary cards"
+    example: "<TEAMS_CHANNEL_ID>"
+  - name: spend_CfoEmail
+    description: "Email address for the monthly PDF report"
+    example: "cfo@contoso.com"
+  - name: spend_CioEmail
+    description: "CC email for the monthly PDF report"
+    example: "cio@contoso.com"
+
+bundle_memberships:
+  - starter-pack: false
+  - core-three: false
+  - enterprise: false

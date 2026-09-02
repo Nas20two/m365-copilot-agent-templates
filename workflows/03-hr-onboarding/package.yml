@@ -36,7 +36,7 @@ env_vars:
     description: "SharePoint list or form response source for new hires"
     example: "New Hires"
   - name: hr_SiteUrl
-    description: "SharePoint site containing the new-hires list"
+    description: "SharePoint site containing the new-hires list and onboarding dashboard"
     example: "https://contoso.sharepoint.com/sites/HR"
   - name: hr_WelcomeSenderEmail
     description: "Email address sending welcome emails"
@@ -44,6 +44,21 @@ env_vars:
   - name: hr_ITContactEmail
     description: "IT contact for equipment-provisioning tasks"
     example: "it-provisioning@contoso.com"
+  - name: hr_DashboardListName
+    description: "SharePoint list that tracks overall onboarding status"
+    example: "Onboarding Dashboard"
+  - name: hr_PlannerPlanId
+    description: "Planner plan ID where onboarding tasks are created"
+    example: "<PLANNER_PLAN_ID>"
+  - name: hr_BucketId
+    description: "Planner bucket ID for new onboarding tasks"
+    example: "<PLANNER_BUCKET_ID>"
+  - name: hr_BuddyTeamId
+    description: "Microsoft Teams team ID for buddy handoff posts"
+    example: "<TEAMS_TEAM_ID>"
+  - name: hr_BuddyChannelId
+    description: "Teams channel where the onboarding buddy receives the handoff card"
+    example: "<TEAMS_CHANNEL_ID>"
 
 bundle_memberships:
   - starter-pack: false

@@ -1,12 +1,15 @@
 # Microsoft Copilot Studio Workflow — AI Spend & Productivity Dashboard
 # Template: cliagent-workflow-1.0.0
-# Price: $99–$149 · Complexity: Advanced · Connectors: Standard + HTTP (no premium)
-# Pairs with: agent-cost-intelligence on nasyhub.com
+# Price: $99 · Complexity: Advanced · Connectors: Standard (+ optional premium)
+# Pairs with: agent-cost-intelligence (nasyhub.com)
 #
 # Import note: This YAML is an AgentSchema-aligned workflow specification.
 # Copilot Studio currently imports workflows via unmanaged solution .zip or
 # the visual designer. Use this file as the build blueprint, then export the
 # resulting workflow as a solution for distribution.
+#
+# Default path uses the standard HTTP connector + manual CSV export. Premium
+# expense-system connectors (Concur, Expensify) are documented as an upgrade.
 
 kind: BotDefinition
 components:
@@ -22,15 +25,14 @@ entity:
     teams:
       kind: TeamsApplicationDetails
       lobDisplayName: AI Spend & Productivity Dashboard
-      shortDescription: Monthly AI-cost intelligence with spend classification, per-team economics, and exec RFIs.
+      shortDescription: Monthly AI spend intelligence with categorization, outlier detection, and exec reporting.
       longDescription: |
-        Pulls AI spend from the corporate card API, expense system, and M365
-        Copilot usage reports each month (or on demand). Classifies every line
-        as Productivity, Experimental, or Shadow IT, computes USD per agent per
-        team per month, flags teams spending above the per-user threshold with
-        no measurable output, posts a Power BI-linked adaptive card to the exec
-        team, and opens human-review RFIs with team leads.
-      accentColor: "#1e7d46"
+        Pulls corporate card transactions and M365 Copilot usage data,
+        classifies every dollar as Productive, Experimental, or Shadow IT,
+        flags outlier teams, generates an AI executive summary, and delivers
+        a CFO-ready report via Teams and Outlook while writing a SharePoint
+        list for Power BI dashboards.
+      accentColor: "#0b6d3e"
   configuration:
     kind: BotConfiguration
     channels:
@@ -53,25 +55,23 @@ entity:
             value: |-
               # Purpose
               You are the conversational interface for the AI Spend &
-              Productivity Dashboard. Executives and team leads can ask about
-              this month's AI spend, per-team per-agent costs, flagged teams,
-              open RFIs, or the latest dashboard snapshot.
+              Productivity Dashboard. Executives can ask for the latest
+              monthly report, request a manual refresh, or drill into a
+              specific team or category.
 
               # General Guidelines
-              - Use only data from the connected AI Spend Log and the last
-                completed dashboard run.
-              - Do not invent dollar amounts, agent counts, or team names.
-              - When asked about flagged teams, list teams in the current RFI
-                cycle and their measured output status.
-              - Cross-reference with the agent-cost-intelligence service on
-                nasyhub.com when the user asks for unit economics forecasts.
+              - Use only data from the connected Spend Dashboard SharePoint
+                list and the latest workflow run.
+              - Do not invent spend figures, team names, or trend commentary.
+              - When asked for a manual run, confirm the workflow will be
+                triggered and share the expected turnaround time.
 
               # Response Format
-              - **Period:** month, year
-              - **Total AI spend:** $X (MoM % change)
-              - **Per team:** team — $/agent — category mix
-              - **Flagged:** team list or "none"
-              - **Open RFIs:** count
+              - **Period:** month/year
+              - **Total spend:** $X
+              - **Top category:** Productive / Experimental / Shadow IT
+              - **Outlier teams:** list or "none"
+              - **Report link:** SharePoint dashboard list URL
       enableMemory: true
       web:
         kind: WebSettings
@@ -84,452 +84,419 @@ entity:
 
 environmentVariables:
   - kind: EnvironmentVariableDefinition
-    displayName: Corporate Card API URL
-    schemaName: aispend_CardApiUrl
+    displayName: Card API URL
+    schemaName: spend_CardApiUrl
     type: String
-    defaultValue: https://api.<COMPANY>.com/corporate-card/transactions?month=current
-    description: Endpoint returning AI/LLM card transactions for the month.
+    defaultValue: https://api.corpcard.com/v1/transactions
+    description: Corporate card API endpoint for transaction data (standard HTTP).
 
   - kind: EnvironmentVariableDefinition
-    displayName: Expense System API URL
-    schemaName: aispend_ExpenseApiUrl
+    displayName: Copilot Usage Report URL
+    schemaName: spend_MonthlyCopilotReportUrl
     type: String
-    defaultValue: https://api.<COMPANY>.com/expense/export?period=monthly
-    description: Endpoint returning the expense-system export for the month.
+    defaultValue: https://graph.microsoft.com/v1.0/reports/getCopilotActivityUserDetail(period='D30')
+    description: Microsoft Graph API endpoint for monthly Copilot usage data.
 
   - kind: EnvironmentVariableDefinition
-    displayName: M365 Copilot Usage Report URL
-    schemaName: aispend_CopilotUsageReportUrl
-    type: String
-    defaultValue: https://<COMPANY>-admin.sharepoint.com/_api/v2.0/usageReports/copilot
-    description: CSV or JSON export of M365 Copilot usage per user (or Microsoft 365 admin usage report endpoint).
+    displayName: Outlier Threshold Per User
+    schemaName: spend_OutlierThresholdPerUser
+    type: Number
+    defaultValue: "500"
+    description: Spend per user (USD) above which a team is flagged as an outlier.
 
   - kind: EnvironmentVariableDefinition
-    displayName: Dashboard SharePoint Site URL
-    schemaName: aispend_SiteUrl
+    displayName: Dashboard Site URL
+    schemaName: spend_DashboardSiteUrl
     type: String
-    defaultValue: https://<COMPANY>.sharepoint.com/sites/AI-Governance
-    description: SharePoint site containing the AI Spend Log list.
+    defaultValue: https://<COMPANY>.sharepoint.com/sites/Finance
+    description: SharePoint site containing the AI Spend Dashboard list.
 
   - kind: EnvironmentVariableDefinition
-    displayName: AI Spend Log List Name
-    schemaName: aispend_SpendListName
+    displayName: Dashboard List Name
+    schemaName: spend_DashboardListName
     type: String
-    defaultValue: AI Spend Log
-    description: SharePoint list where classified spend lines are logged monthly.
+    defaultValue: AI Spend Dashboard
+    description: SharePoint list that stores monthly spend reports for Power BI.
 
   - kind: EnvironmentVariableDefinition
-    displayName: Power BI Embed URL
-    schemaName: aispend_PowerBiEmbedUrl
-    type: String
-    defaultValue: https://app.powerbi.com/groups/me/reports/<REPORT_ID>
-    description: Power BI report URL embedded in exec cards and emails.
-
-  - kind: EnvironmentVariableDefinition
-    displayName: Teams Team ID
-    schemaName: aispend_TeamsTeamId
+    displayName: Executive Team ID
+    schemaName: spend_ExecTeamId
     type: String
     defaultValue: <TEAMS_TEAM_ID>
-    description: Teams team containing the exec AI-governance channel.
+    description: Microsoft Teams team ID containing the executive summary channel.
 
   - kind: EnvironmentVariableDefinition
-    displayName: Teams Channel ID
-    schemaName: aispend_TeamsChannelId
+    displayName: Executive Channel ID
+    schemaName: spend_ExecChannelId
     type: String
     defaultValue: <TEAMS_CHANNEL_ID>
-    description: Teams channel where monthly dashboard cards are posted.
+    description: Teams channel where the monthly executive summary is posted.
 
   - kind: EnvironmentVariableDefinition
-    displayName: Executive Recipient Email
-    schemaName: aispend_ExecutiveEmail
+    displayName: CFO Email
+    schemaName: spend_CfoEmail
     type: String
-    defaultValue: cfo@<COMPANY>.com
-    description: Exec team mailbox receiving the monthly AI spend brief.
+    defaultValue: cfo@<COMPANY>.onmicrosoft.com
+    description: Primary recipient of the monthly report email.
 
   - kind: EnvironmentVariableDefinition
-    displayName: Governance Owner Email
-    schemaName: aispend_GovernanceOwnerEmail
+    displayName: CIO Email
+    schemaName: spend_CioEmail
     type: String
-    defaultValue: ai-governance@<COMPANY>.com
-    description: Owner of the AI RFI review cycle (human review approver).
-
-  - kind: EnvironmentVariableDefinition
-    displayName: Per-User Spend Threshold
-    schemaName: aispend_ThresholdPerUser
-    type: Number
-    defaultValue: "50"
-    description: USD per user/per month above which a team is flagged when no measurable output is reported.
-
-  - kind: EnvironmentVariableDefinition
-    displayName: Report Day of Month
-    schemaName: aispend_ReportDay
-    type: Number
-    defaultValue: "1"
-    description: Day of month the dashboard runs (recurring trigger).
-
-  - kind: EnvironmentVariableDefinition
-    displayName: Report Time (UTC)
-    schemaName: aispend_ReportTimeUtc
-    type: String
-    defaultValue: "08:00"
-    description: Time the dashboard runs (HH:mm, UTC).
+    defaultValue: cio@<COMPANY>.onmicrosoft.com
+    description: CC recipient of the monthly report email.
 
 connectionReferences:
   - kind: ConnectionReference
     displayName: HTTP
-    schemaName: aispend_HttpConnection
+    schemaName: spend_HttpConnection
     connectorId: /providers/Microsoft.PowerApps/apis/shared_http
-    description: Minimal-authentication HTTP connection for corporate card, expense, and Copilot usage report pulls.
+    description: Connection for corporate card API and Microsoft Graph API calls.
 
   - kind: ConnectionReference
     displayName: SharePoint Online
-    schemaName: aispend_SharePointConnection
+    schemaName: spend_SharePointConnection
     connectorId: /providers/Microsoft.PowerApps/apis/shared_sharepointonline
-    description: Connection to the AI Spend Log list and RFI tracking list.
+    description: Connection for the AI Spend Dashboard list and outlier task log.
 
   - kind: ConnectionReference
     displayName: Exchange Online
-    schemaName: aispend_OutlookConnection
+    schemaName: spend_ExchangeOnlineConnection
     connectorId: /providers/Microsoft.PowerApps/apis/shared_office365
-    description: Connection used for exec briefs and team-lead RFI emails.
+    description: Connection for CFO/CIO report emails.
 
   - kind: ConnectionReference
     displayName: Microsoft Teams
-    schemaName: aispend_TeamsConnection
+    schemaName: spend_TeamsConnection
     connectorId: /providers/Microsoft.PowerApps/apis/shared_teams
-    description: Connection used to post monthly dashboard and RFI cards to Teams.
+    description: Connection for executive summary adaptive cards.
 
 flows:
   - kind: WorkflowDefinition
-    id: ai-spend-monthly-pull
-    displayName: AI Spend — Monthly Pull & Report
-    description: Monthly (or on-demand) pull of card, expense, and Copilot usage data, AI classification, per-agent costing, flagging, and exec reporting with RFIs to team leads.
+    id: ai-spend-report
+    displayName: AI Spend & Productivity — Monthly Report
+    description: |
+      Runs on the first of each month or on demand. Pulls card and Copilot
+      usage data, classifies spend, detects outliers, writes the dashboard,
+      and delivers the executive report.
     status: Active
-    trigger:
-      kind: BuiltInTrigger
-      type: Recurrence
-      displayName: Monthly dashboard schedule
-      inputs:
-        frequency: Month
-        interval: 1
-        day: 1
-        startTime: "2026-10-01T08:00:00Z"
-        timeZone: UTC
+
+    triggers:
+      - kind: BuiltInTrigger
+        id: trigger-monthly
+        displayName: Monthly report schedule
+        type: Recurrence
+        inputs:
+          frequency: Month
+          interval: 1
+          startTime: "2026-10-01T09:00:00Z"
+          timeZone: UTC
+
+      - kind: BuiltInTrigger
+        id: trigger-manual
+        displayName: Manual report run
+        type: Manual
+        inputs: {}
 
     variables:
-      - name: spendRows
+      - name: cardTransactions
         type: Array
         default: []
-      - name: shadowRows
+      - name: copilotUsage
         type: Array
         default: []
-      - name: rowCategory
+      - name: classifiedSpend
+        type: Array
+        default: []
+      - name: aggregates
+        type: Object
+        default:
+          totalSpend: 0
+          productiveSpend: 0
+          experimentalSpend: 0
+          shadowItSpend: 0
+          perTeam: []
+          perUser: []
+          outlierTeams: []
+      - name: executiveSummary
         type: String
-        default: Productivity
-      - name: execNarrative
+        default: ""
+      - name: reportMonth
         type: String
         default: ""
 
     actions:
-      - kind: ConnectorAction
-        name: Pull corporate card transactions
-        connector: http
-        operation: Send_an_HTTP_request
-        connectionReference: aispend_HttpConnection
+      - kind: SetVariableAction
+        name: Set report month
         inputs:
-          method: GET
-          uri: "@{environmentVariables('aispend_CardApiUrl')}"
-          headers:
-            Accept: application/json
+          variable: reportMonth
+          value: "@{formatDateTime(utcNow(), 'yyyy-MM')}"
 
       - kind: ConnectorAction
-        name: Pull expense system export
+        name: Get card transactions
         connector: http
-        operation: Send_an_HTTP_request
-        connectionReference: aispend_HttpConnection
+        operation: InvokeApi
+        connectionReference: spend_HttpConnection
         inputs:
           method: GET
-          uri: "@{environmentVariables('aispend_ExpenseApiUrl')}"
+          uri: "@{environmentVariables('spend_CardApiUrl')}?period=30days"
           headers:
             Accept: application/json
+          body: null
+        outputs:
+          body: string
 
       - kind: ConnectorAction
-        name: Pull Copilot usage report
+        name: Get Copilot usage
         connector: http
-        operation: Send_an_HTTP_request
-        connectionReference: aispend_HttpConnection
+        operation: InvokeApi
+        connectionReference: spend_HttpConnection
         inputs:
           method: GET
-          uri: "@{environmentVariables('aispend_CopilotUsageReportUrl')}"
+          uri: "@{environmentVariables('spend_MonthlyCopilotReportUrl')}"
           headers:
             Accept: application/json
+          body: null
+        outputs:
+          body: string
 
       - kind: SetVariableAction
-        name: Combine spend rows
+        name: Parse card transactions
         inputs:
-          variable: spendRows
-          value: "@{union(outputs('Pull corporate card transactions')?['body']?['value'], outputs('Pull expense system export')?['body']?['value'])}"
+          variable: cardTransactions
+          value: "@{json(outputs('Get card transactions')?['body'])}"
 
-      - kind: LoopAction
-        name: Classify and log each spend line
-        items: "@{variables('spendRows')}"
-        type: ApplyToEach
-        actions:
-          - kind: AIClassifyAction
-            name: Classify spend category
-            model: gpt-4o
-            prompt: |-
-              Classify each AI spend line into exactly one category:
-              Productivity, Experimental, or Shadow IT.
-
-              Rules:
-              - Productivity: usage tied to approved workflows, Copilot, sanctioned agents,
-                or measurable delivery (support tickets, docs, pipelines).
-              - Experimental: pilots, small tokens, test keys, hack-days, sandbox
-                environments with no business owner.
-              - Shadow IT: spend from unknown departments, personal accounts,
-                uncategorized merchants, or tools without an owner.
-
-              Line: vendor="@{item()?['Vendor']}", amount=$@{item()?['Amount']},
-              department=@{item()?['Department']}, description=@{item()?['Description']}
-
-              Respond with ONLY the category.
-            output:
-              name: category
-              type: String
-              expectedValues: [Productivity, Experimental, Shadow IT]
-            onFailure: Continue
-            fallbackValue: Experimental
-
-          - kind: SetVariableAction
-            name: Store row category
-            inputs:
-              variable: rowCategory
-              value: "@{outputs('Classify spend category')?['category']}"
-
-          - kind: ConnectorAction
-            name: Log spend line to SharePoint
-            connector: sharepointonline
-            operation: CreateItem
-            connectionReference: aispend_SharePointConnection
-            inputs:
-              siteAddress: "@{environmentVariables('aispend_SiteUrl')}"
-              listName: "@{environmentVariables('aispend_SpendListName')}"
-              item:
-                Title: "@{item()?['Description']}"
-                Vendor: "@{item()?['Vendor']}"
-                Amount: "@{item()?['Amount']}"
-                Department: "@{item()?['Department']}"
-                User: "@{item()?['User']}"
-                Category: "@{variables('rowCategory')}"
-                Month: "@{formatDateTime(utcNow(), 'yyyy-MM')}"
-            onFailure: Continue
-
-          - kind: ConditionAction
-            name: Is shadow spend?
-            condition:
-              operator: equals
-              left: "@{variables('rowCategory')}"
-              right: Shadow IT
-            trueBranch:
-              - kind: SetVariableAction
-                name: Collect flagged row
-                inputs:
-                  variable: shadowRows
-                  value: "@{union(variables('shadowRows'), createArray(createObject('vendor', item()?['Vendor'], 'amount', item()?['Amount'], 'department', item()?['Department'], 'user', item()?['User'], 'leadEmail', item()?['LeadEmail'])))}"
-            falseBranch: []
+      - kind: SetVariableAction
+        name: Parse Copilot usage
+        inputs:
+          variable: copilotUsage
+          value: "@{json(outputs('Get Copilot usage')?['body'])}"
 
       - kind: PromptAction
-        name: Compute per-agent economics
+        name: Classify spend lines
         model: gpt-4o
         prompt: |-
-          You are the AI-cost controller. Compute from the JSON rows below —
-          total USD; USD per agent per team per month (use ~100 agents per team
-          scale unless given); productivity vs experimental vs shadow share; and
-          the teams whose USD per user exceeds $@{environmentVariables('aispend_ThresholdPerUser')}
-          per user per month.
+          You are an AI spend analyst. Classify each transaction below as
+          Productive, Experimental, or Shadow IT. Use these definitions:
+          - Productive: directly tied to a known project, approved tool, or
+            measurable business outcome.
+          - Experimental: pilot, R&D, or evaluation spend with unclear ROI.
+          - Shadow IT: spend outside approved procurement, duplicate tools, or
+            no business justification.
 
-          Rows: @{json(variables('spendRows'))}
+          Transactions:
+          @{json(variables('cardTransactions'))}
 
-          Output only JSON: {"total":number,"perTeam":[{"team":string,"usdPerAgent":number,"categoryShare":{...}}],"overThreshold":[...],"flagTeams":[{"team":string,"usdPerAgent":number,"primaryAgent":"name"}]}
+          Respond ONLY with a JSON object:
+          {
+            "classifications": [
+              {"id": "...", "vendor": "...", "amount": 0, "team": "...", "user": "...", "category": "Productive"}
+            ]
+          }
         output:
-          name: execNarrative
-          type: String
-        onFailure: Continue
-        fallbackValue: "{}"
-
-      - kind: ConditionAction
-        name: Are there flagged teams?
-        condition:
-          operator: greater
-          left: "@{length(variables('shadowRows'))}"
-          right: 0
-        trueBranch:
-          - kind: ConnectorAction
-            name: Post exec alert card
-            connector: teams
-            operation: PostMessageToChannelV3
-            connectionReference: aispend_TeamsConnection
-            inputs:
-              teamId: "@{environmentVariables('aispend_TeamsTeamId')}"
-              channelId: "@{environmentVariables('aispend_TeamsChannelId')}"
-              messageBody:
-                type: AdaptiveCard
-                version: "1.5"
-                body:
-                  - type: TextBlock
-                    text: "⚠️  AI spend flagged — Shadow/Experimental over threshold"
-                    weight: Bolder
-                    color: Attention
-                  - type: TextBlock
-                    text: "Analysis: @{outputs('Compute per-agent economics')?['execNarrative']}"
-                  - type: ActionSet
-                    actions:
-                      - type: Action.OpenUrl
-                        title: Open Power BI dashboard
-                        url: "@{environmentVariables('aispend_PowerBiEmbedUrl')}"
-
-          - kind: RFIAction
-            name: Request human review of flagged spend
-            inputs:
-              type: HumanApproval
-              title: "AI spend review — month @{formatDateTime(utcNow(), 'yyyy-MM')}"
-              instructions: |-
-                Review the flagged Shadow IT and over-threshold spend for the
-                month. Confirm whether to open an RFI with the team leads, or
-                waive the flags.
-                Flagged rows: @{json(variables('shadowRows'))}
-              assigneeEmail: "@{environmentVariables('aispend_GovernanceOwnerEmail')}"
-            outputs:
-              decision: String
-              comments: String
-            onFailure: Continue
-            fallbackValue: Approved
-
-          - kind: ConditionAction
-            name: RFI approved?
-            condition:
-              operator: equals
-              left: "@{outputs('Request human review of flagged spend')?['decision']}"
-              right: Approve
-            trueBranch:
-              - kind: LoopAction
-                name: Send RFI to each flagged team lead
-                items: "@{variables('shadowRows')}"
-                type: ApplyToEach
-                actions:
-                  - kind: ConnectorAction
-                    name: Send RFI email to team lead
-                    connector: office365
-                    operation: SendEmailV2
-                    connectionReference: aispend_OutlookConnection
-                    inputs:
-                      to: "@{item()?['leadEmail']}"
-                      subject: "[AI RFI] Your team's AI spend — @{item()?['department']}"
-                      body: |
-                        We flagged @{item()?['vendor']} activity ($@{item()?['amount']})
-                        from @{item()?['department']} as Shadow/Experimental spend
-                        with no measurable output.
-
-                        Reply with this month's usage summary and the business
-                        outcomes delivered; otherwise access may be restricted.
-                    onFailure: Continue
-            falseBranch: []
-
-        falseBranch: []
-
-      - kind: ConnectorAction
-        name: Send monthly exec brief email
-        connector: office365
-        operation: SendEmailV2
-        connectionReference: aispend_OutlookConnection
-        inputs:
-          to: "@{environmentVariables('aispend_ExecutiveEmail')}"
-          subject: "AI Spend & Productivity — @{formatDateTime(utcNow(), 'yyyy-MM')}"
-          body: |
-            <h2>AI Spend & Productivity</h2>
-            <p>@{outputs('Compute per-agent economics')?['execNarrative']}</p>
-            <p>Dashboard: <a href='@{environmentVariables('aispend_PowerBiEmbedUrl')}'>Power BI</a></p>
-            <p>Flagged: @{length(variables('shadowRows'))} lines · RFI: open</p>
-        onFailure: Continue
-
-      - kind: TerminateAction
-        name: End — monthly report
-        status: Succeeded
-
-  - kind: WorkflowDefinition
-    id: ai-spend-rfi-followup
-    displayName: AI Spend — RFI Follow-up
-    description: Daily reminders for open RFIs in the AI Spend Log until team leads respond.
-    status: Active
-    trigger:
-      kind: BuiltInTrigger
-      type: Recurrence
-      displayName: Daily RFI follow-up
-      inputs:
-        frequency: Day
-        interval: 1
-        startTime: "2026-10-02T08:00:00Z"
-        timeZone: UTC
-
-    variables:
-      - name: openRfis
-        type: Array
-        default: []
-
-    actions:
-      - kind: ConnectorAction
-        name: Get pending RFI log lines
-        connector: sharepointonline
-        operation: GetItems
-        connectionReference: aispend_SharePointConnection
-        inputs:
-          siteAddress: "@{environmentVariables('aispend_SiteUrl')}"
-          listName: "@{environmentVariables('aispend_SpendListName')}"
-          filterQuery: "Status eq 'RFI Open'"
-          top: 200
+          name: result
+          type: Object
+          schema:
+            classifications: array
+        onFailure:
+          action: SetVariableAction
+          inputs:
+            variable: classifiedSpend
+            value: []
 
       - kind: SetVariableAction
-        name: Capture open RFIs
+        name: Store classified spend
         inputs:
-          variable: openRfis
-          value: "@{outputs('Get pending RFI log lines')?['body/value']}"
+          variable: classifiedSpend
+          value: "@{coalesce(outputs('Classify spend lines')?['result']?['classifications'], variables('classifiedSpend'))}"
 
-      - kind: LoopAction
-        name: Remind each open RFI
-        type: ApplyToEach
-        items: "@{variables('openRfis')}"
-        actions:
-          - kind: ConnectorAction
-            name: Post RFI reminder to Teams
-            onFailure: Continue
-            connector: teams
-            operation: PostMessageToChannelV3
-            connectionReference: aispend_TeamsConnection
-            inputs:
-              teamId: "@{environmentVariables('aispend_TeamsTeamId')}"
-              channelId: "@{environmentVariables('aispend_TeamsChannelId')}"
-              messageBody:
-                type: AdaptiveCard
-                version: "1.5"
-                body:
-                  - type: TextBlock
-                    text: "🔁 Open AI RFI (day @{dayOfYear(utcNow())}): @{item()?['Department']} — @{item()?['Vendor']}"
-                    weight: Bolder
+      - kind: PromptAction
+        name: Aggregate spend
+        model: gpt-4o
+        prompt: |-
+          You are a financial analyst. Aggregate the classified spend data
+          below and flag outlier teams where spend per user exceeds
+          $@{environmentVariables('spend_OutlierThresholdPerUser')} and the team
+          has no measurable output.
 
-          - kind: ConnectorAction
-            name: Email team lead reminder
-            connector: office365
-            operation: SendEmailV2
-            connectionReference: aispend_OutlookConnection
-            inputs:
-              to: "@{item()?['LeadEmail']}"
-              subject: "[RFI REMINDER] AI spend — @{item()?['Department']}"
-              body: |
-                Reminder: please respond to the AI spend RFI opened for
-                @{item()?['Vendor']} ($@{item()?['Amount']}) last week.
-            onFailure: Continue
+          Classified transactions:
+          @{json(variables('classifiedSpend'))}
+
+          Copilot usage context:
+          @{json(variables('copilotUsage'))}
+
+          Respond ONLY with a JSON object:
+          {
+            "totalSpend": number,
+            "productiveSpend": number,
+            "experimentalSpend": number,
+            "shadowItSpend": number,
+            "perTeam": [{"team": "...", "spend": number, "users": number, "spendPerUser": number}],
+            "perUser": [{"user": "...", "spend": number}],
+            "outlierTeams": [{"team": "...", "spendPerUser": number, "spend": number}]
+          }
+        output:
+          name: result
+          type: Object
+          schema:
+            totalSpend: number
+            productiveSpend: number
+            experimentalSpend: number
+            shadowItSpend: number
+            perTeam: array
+            perUser: array
+            outlierTeams: array
+        onFailure:
+          action: SetVariableAction
+          inputs:
+            variable: aggregates
+            value:
+              totalSpend: 0
+              productiveSpend: 0
+              experimentalSpend: 0
+              shadowItSpend: 0
+              perTeam: []
+              perUser: []
+              outlierTeams: []
+
+      - kind: SetVariableAction
+        name: Store aggregates
+        inputs:
+          variable: aggregates
+          value: "@{coalesce(outputs('Aggregate spend')?['result'], variables('aggregates'))}"
+
+      - kind: ConditionAction
+        name: Any outlier teams?
+        condition:
+          operator: greater
+          left: "@{length(variables('aggregates')?['outlierTeams'])}"
+          right: "0"
+        trueBranch:
+          - kind: LoopAction
+            name: Log outlier teams
+            type: ApplyToEach
+            items: "@{variables('aggregates')?['outlierTeams']}"
+            actions:
+              - kind: ConnectorAction
+                name: Create outlier task
+                connector: sharepointonline
+                operation: CreateItem
+                connectionReference: spend_SharePointConnection
+                inputs:
+                  siteAddress: "@{environmentVariables('spend_DashboardSiteUrl')}"
+                  listName: "@{environmentVariables('spend_DashboardListName')}"
+                  item:
+                    Title: "Outlier: @{item()?['team']}"
+                    ReportMonth: "@{variables('reportMonth')}"
+                    Team: "@{item()?['team']}"
+                    SpendPerUser: "@{item()?['spendPerUser']}"
+                    TotalSpend: "@{item()?['spend']}"
+                    Category: Outlier
+                    Status: Flagged
+                onFailure: Continue
+        falseBranch: []
+
+      - kind: PromptAction
+        name: Generate executive summary
+        model: gpt-4o
+        prompt: |-
+          You are a CFO advisor. Write a 3-paragraph executive summary of the
+          monthly AI spend data below. Paragraph 1: headline numbers and
+          month-over-month tone. Paragraph 2: distribution across Productive,
+          Experimental, and Shadow IT. Paragraph 3: outlier teams and
+          recommended actions. Keep it under 200 words.
+
+          Aggregates:
+          @{json(variables('aggregates'))}
+
+          Report month: @{variables('reportMonth')}
+        output:
+          name: narrative
+          type: String
+        onFailure: Continue
+        fallbackValue: |
+          AI spend report for @{variables('reportMonth')}: total spend
+          $@{variables('aggregates')['totalSpend']}. See dashboard for details.
+
+      - kind: SetVariableAction
+        name: Store executive summary
+        inputs:
+          variable: executiveSummary
+          value: "@{outputs('Generate executive summary')?['narrative']}"
+
+      - kind: ConnectorAction
+        name: Write dashboard summary
+        connector: sharepointonline
+        operation: CreateItem
+        connectionReference: spend_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('spend_DashboardSiteUrl')}"
+          listName: "@{environmentVariables('spend_DashboardListName')}"
+          item:
+            Title: "AI Spend Report — @{variables('reportMonth')}"
+            ReportMonth: "@{variables('reportMonth')}"
+            TotalSpend: "@{variables('aggregates')['totalSpend']}"
+            ProductiveSpend: "@{variables('aggregates')['productiveSpend']}"
+            ExperimentalSpend: "@{variables('aggregates')['experimentalSpend']}"
+            ShadowItSpend: "@{variables('aggregates')['shadowItSpend']}"
+            PerTeamJson: "@{json(variables('aggregates')['perTeam'])}"
+            OutlierTeamsJson: "@{json(variables('aggregates')['outlierTeams'])}"
+            ExecutiveSummary: "@{variables('executiveSummary')}"
+            Category: Summary
+            Status: Published
+            PublishedAt: "@{utcNow()}"
+        outputs:
+          id: string
+
+      - kind: ConnectorAction
+        name: Post executive card to Teams
+        connector: teams
+        operation: PostMessageToChannelV3
+        connectionReference: spend_TeamsConnection
+        inputs:
+          teamId: "@{environmentVariables('spend_ExecTeamId')}"
+          channelId: "@{environmentVariables('spend_ExecChannelId')}"
+          messageBody:
+            type: AdaptiveCard
+            version: "1.5"
+            body:
+              - type: TextBlock
+                text: "📊 AI Spend Report — @{variables('reportMonth')}"
+                weight: Bolder
+                size: Medium
+              - type: TextBlock
+                text: "Total: $@{variables('aggregates')['totalSpend']} | Productive: $@{variables('aggregates')['productiveSpend']} | Experimental: $@{variables('aggregates')['experimentalSpend']} | Shadow IT: $@{variables('aggregates')['shadowItSpend']}"
+              - type: TextBlock
+                text: "Outlier teams: @{length(variables('aggregates')['outlierTeams'])}"
+              - type: TextBlock
+                text: "@{variables('executiveSummary')}"
+                wrap: true
+        onFailure: Continue
+
+      - kind: ConnectorAction
+        name: Email report to CFO/CIO
+        connector: office365
+        operation: SendEmailV2
+        connectionReference: spend_ExchangeOnlineConnection
+        inputs:
+          to: "@{environmentVariables('spend_CfoEmail')}"
+          cc: "@{environmentVariables('spend_CioEmail')}"
+          subject: "AI Spend & Productivity Report — @{variables('reportMonth')}"
+          body: |
+            <h2>AI Spend & Productivity Report — @{variables('reportMonth')}</h2>
+            <p>@{variables('executiveSummary')}</p>
+            <table>
+              <tr><th>Category</th><th>Spend</th></tr>
+              <tr><td>Productive</td><td>$@{variables('aggregates')['productiveSpend']}</td></tr>
+              <tr><td>Experimental</td><td>$@{variables('aggregates')['experimentalSpend']}</td></tr>
+              <tr><td>Shadow IT</td><td>$@{variables('aggregates')['shadowItSpend']}</td></tr>
+              <tr><td><b>Total</b></td><td><b>$@{variables('aggregates')['totalSpend']}</b></td></tr>
+            </table>
+            <p>Outlier teams flagged: @{length(variables('aggregates')['outlierTeams'])}</p>
+            <p>Dashboard: @{environmentVariables('spend_DashboardSiteUrl')}/Lists/@{environmentVariables('spend_DashboardListName')}</p>
+            <p><em>Premium PDF attachment can be enabled with a premium connector or manual export.</em></p>
+        onFailure: Continue
 
       - kind: TerminateAction
-        name: End — RFI follow-up
+        name: End — spend report
         status: Succeeded
