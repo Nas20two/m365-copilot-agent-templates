@@ -1,0 +1,492 @@
+# Microsoft Copilot Studio Workflow — Email Triage & Daily Digest
+# Template: cliagent-workflow-1.0.0
+# Price: $29–$49 · Complexity: Standard · Connectors: Standard only
+# Pairs with: any existing MD Copilot Agent (standalone, no agent dependency)
+#
+# Import note: This YAML is an AgentSchema-aligned workflow specification.
+# Copilot Studio currently imports workflows via unmanaged solution .zip or
+# the visual designer. Use this file as the build blueprint, then export the
+# resulting workflow as a solution for distribution.
+
+kind: BotDefinition
+components:
+  - kind: BotSettingsComponent
+    settings:
+      kind: DefaultFeedbackCollection
+
+entity:
+  kind: BotEntity
+  displayName: Email Triage & Daily Digest Workflow
+  teamsAppInformation:
+    kind: ApplicationDetails
+    teams:
+      kind: TeamsApplicationDetails
+      lobDisplayName: Email Triage & Daily Digest
+      shortDescription: AI triage for shared inboxes with Teams routing and daily digest.
+      longDescription: |
+        Routes incoming shared-inbox emails through AI classification, surfaces
+        urgent items to a Teams channel and assignee, files attachments to
+        SharePoint, and sends an end-of-day digest email with stats.
+      accentColor: "#0078d4"
+  configuration:
+    kind: BotConfiguration
+    channels:
+      - kind: ChannelDefinition
+        id: Microsoft365Copilot
+        channelId: Microsoft365Copilot
+      - kind: ChannelDefinition
+        id: MsTeams
+        channelId: MsTeams
+    recognizer:
+      kind: CLICopilotRecognizer
+    agentSettings:
+      kind: AgentSettings
+      version: "1.0"
+      model:
+        series: claude-opus-5
+      instructions:
+        segments:
+          - kind: StaticSegment
+            value: |-
+              # Purpose
+              You are the conversational entry point for the Email Triage & Daily
+              Digest workflow. Users can ask about today's triage status, request
+              a manual digest, or ask why a specific email was classified a
+              certain way.
+
+              # General Guidelines
+              - Use only the data surfaced by the connected workflow runs.
+              - Do not make up email subjects, sender names, or priority labels.
+              - When asked for a digest, summarize the last completed digest run.
+              - For classification questions, explain the priority label and the
+                rule that triggered routing.
+
+              # Response Format
+              - **Priority:** Low / Medium / High / Critical
+              - **Action taken:** Teams alert, digest entry, filed, or none
+              - **Source:** workflow run ID or connected mailbox
+      enableMemory: true
+      web:
+        kind: WebSettings
+        enableWebSearch: false
+  publishedOn: 2026-09-02T00:00:00Z
+  synchronizationStatus:
+    kind: BotSynchronizationDetails
+    contentVersion: 2
+  template: cliagent-workflow-1.0.0
+
+environmentVariables:
+  - kind: EnvironmentVariableDefinition
+    displayName: Shared Mailbox Address
+    schemaName: triage_MailboxAddress
+    type: String
+    defaultValue: shared@<COMPANY>.onmicrosoft.com
+    description: Exchange Online mailbox monitored for incoming email.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: SharePoint Attachment Site URL
+    schemaName: triage_AttachmentSiteUrl
+    type: String
+    defaultValue: https://<COMPANY>.sharepoint.com/sites/EmailTriage
+    description: SharePoint site containing the attachments document library.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Attachment Library Name
+    schemaName: triage_AttachmentLibraryName
+    type: String
+    defaultValue: Filed Attachments
+    description: Document library where email attachments are saved.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Teams Channel ID
+    schemaName: triage_TeamsChannelId
+    type: String
+    defaultValue: <TEAMS_CHANNEL_ID>
+    description: Teams channel where urgent items are posted.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Urgency Assignee Email
+    schemaName: triage_UrgencyAssigneeEmail
+    type: String
+    defaultValue: ops@<COMPANY>.com
+    description: Email address notified for Critical/High items.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Digest Time (UTC)
+    schemaName: triage_DigestTimeUtc
+    type: String
+    defaultValue: "18:00"
+    description: Time of day to send the daily digest (HH:mm, UTC).
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Summary Word Limit
+    schemaName: triage_SummaryWordLimit
+    type: Number
+    defaultValue: "75"
+    description: Target word count for thread summaries.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Body Length Threshold
+    schemaName: triage_BodyLengthThreshold
+    type: Number
+    defaultValue: "300"
+    description: Minimum body character count before the summarizer runs.
+
+connectionReferences:
+  - kind: ConnectionReference
+    displayName: Exchange Online
+    schemaName: triage_ExchangeOnlineConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_office365
+    description: Connection to the monitored Exchange Online mailbox.
+
+  - kind: ConnectionReference
+    displayName: SharePoint Online
+    schemaName: triage_SharePointConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_sharepointonline
+    description: Connection to the SharePoint site for filed attachments.
+
+  - kind: ConnectionReference
+    displayName: Microsoft Teams
+    schemaName: triage_TeamsConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_teams
+    description: Connection used to post urgent-item messages to Teams.
+
+flows:
+  - kind: WorkflowDefinition
+    id: email-triage-realtime
+    displayName: Email Triage — Real-time
+    description: Triggered when a new email arrives in the shared mailbox.
+    status: Active
+    trigger:
+      kind: ConnectorTrigger
+      type: Event
+      displayName: When a new email arrives (V3)
+      connector: office365
+      operation: OnNewEmailV3
+      connectionReference: triage_ExchangeOnlineConnection
+      inputs:
+        folderPath: Inbox
+        to: shared@<COMPANY>.onmicrosoft.com
+        importance: Any
+        includeAttachments: true
+        subjectFilter: null
+      outputs:
+        messageId: string
+        conversationId: string
+        subject: string
+        body: string
+        from: string
+        receivedDateTime: dateTime
+        hasAttachments: boolean
+        attachments: array
+
+    variables:
+      - name: priority
+        type: String
+        default: Medium
+      - name: summary
+        type: String
+        default: ""
+      - name: filingPath
+        type: String
+        default: ""
+      - name: digestEntry
+        type: Object
+        default: {}
+
+    actions:
+      - kind: SetVariableAction
+        name: Initialize digest entry
+        inputs:
+          variable: digestEntry
+          value:
+            messageId: "@{triggerOutputs()?['messageId']}"
+            receivedAt: "@{triggerOutputs()?['receivedDateTime']}"
+            subject: "@{triggerOutputs()?['subject']}"
+            from: "@{triggerOutputs()?['from']}"
+            priority: "@{variables('priority')}"
+            summary: ""
+            filedTo: ""
+
+      - kind: AIClassifyAction
+        name: Classify email priority
+        model: claude-opus-5
+        prompt: |-
+          You are an email triage assistant for a shared business inbox.
+          Classify the email below into exactly one priority: Low, Medium, High, or Critical.
+
+          Rules:
+          - Critical: legal threat, service outage, security incident, C-suite escalation,
+            or explicit deadline today.
+          - High: vendor issue, customer complaint, contract question, deadline within 48h.
+          - Medium: general request, FYI, non-urgent coordination.
+          - Low: newsletters, marketing, automated notifications, no action needed.
+
+          Respond with ONLY the priority label.
+
+          Subject: @{triggerOutputs()?['subject']}
+          From: @{triggerOutputs()?['from']}
+          Body (first 2000 chars):
+          @{substring(triggerOutputs()?['body'], 0, min(length(triggerOutputs()?['body']), 2000))}
+        output:
+          name: priority
+          type: String
+          expectedValues: [Low, Medium, High, Critical]
+        onFailure: Continue
+        fallbackValue: Medium
+
+      - kind: SetVariableAction
+        name: Store priority
+        inputs:
+          variable: priority
+          value: "@{outputs('Classify email priority')?['priority']}"
+
+      - kind: ConditionAction
+        name: Is urgent?
+        condition:
+          operator: in
+          left: "@{variables('priority')}"
+          right: [High, Critical]
+        trueBranch:
+          - kind: ConnectorAction
+            name: Post urgent item to Teams
+            connector: teams
+            operation: PostMessageToChannelV3
+            connectionReference: triage_TeamsConnection
+            inputs:
+              teamId: <TEAMS_TEAM_ID>
+              channelId: "@{environmentVariables('triage_TeamsChannelId')}"
+              messageBody:
+                type: AdaptiveCard
+                version: "1.5"
+                body:
+                  - type: TextBlock
+                    text: "🚨 Urgent email: @{variables('priority')}"
+                    weight: Bolder
+                    size: Medium
+                  - type: TextBlock
+                    text: "From: @{triggerOutputs()?['from']}"
+                  - type: TextBlock
+                    text: "Subject: @{triggerOutputs()?['subject']}"
+                  - type: TextBlock
+                    text: "Received: @{triggerOutputs()?['receivedDateTime']}"
+            onFailure: Terminate
+
+          - kind: ConnectorAction
+            name: Notify assignee via Outlook
+            connector: office365
+            operation: SendEmailV2
+            connectionReference: triage_ExchangeOnlineConnection
+            inputs:
+              to: "@{environmentVariables('triage_UrgencyAssigneeEmail')}"
+              subject: "[URGENT] @{triggerOutputs()?['subject']}"
+              body: |
+                A @{variables('priority')} priority email arrived in the shared inbox.
+
+                From: @{triggerOutputs()?['from']}
+                Subject: @{triggerOutputs()?['subject']}
+                Received: @{triggerOutputs()?['receivedDateTime']}
+
+                Review in Teams: @{outputs('Post urgent item to Teams')?['linkToMessage']}
+            onFailure: Continue
+
+        falseBranch: []
+
+      - kind: ConditionAction
+        name: Needs summary?
+        condition:
+          operator: greater
+          left: "@{length(triggerOutputs()?['body'])}"
+          right: "@{int(environmentVariables('triage_BodyLengthThreshold'))}"
+        trueBranch:
+          - kind: PromptAction
+            name: Summarize long thread
+            model: claude-opus-5
+            prompt: |-
+              Summarize the following email thread in @{environmentVariables('triage_SummaryWordLimit')} words or less.
+              Capture: sender intent, key facts, requested actions, and any deadlines.
+              Do not add information not present in the email.
+
+              @{triggerOutputs()?['body']}
+            output:
+              name: summary
+              type: String
+            onFailure: Continue
+            fallbackValue: "(Summary unavailable)"
+
+          - kind: SetVariableAction
+            name: Store summary
+            inputs:
+              variable: summary
+              value: "@{outputs('Summarize long thread')?['summary']}"
+
+        falseBranch: []
+
+      - kind: ConditionAction
+        name: Has attachments?
+        condition:
+          operator: equals
+          left: "@{triggerOutputs()?['hasAttachments']}"
+          right: "true"
+        trueBranch:
+          - kind: ConnectorAction
+            name: Create folder for thread
+            connector: sharepointonline
+            operation: CreateFolder
+            connectionReference: triage_SharePointConnection
+            inputs:
+              siteAddress: "@{environmentVariables('triage_AttachmentSiteUrl')}"
+              listName: "@{environmentVariables('triage_AttachmentLibraryName')}"
+              folderPath: "/@{formatDateTime(triggerOutputs()?['receivedDateTime'], 'yyyy-MM-dd')}/@{triggerOutputs()?['conversationId']}"
+            onFailure: Continue
+
+          - kind: ConnectorAction
+            name: Save attachments to SharePoint
+            connector: sharepointonline
+            operation: CreateFile
+            connectionReference: triage_SharePointConnection
+            inputs:
+              siteAddress: "@{environmentVariables('triage_AttachmentSiteUrl')}"
+              folderPath: "@{outputs('Create folder for thread')?['Path']}"
+              fileName: "@{item()?['name']}"
+              fileContent: "@{item()?['contentBytes']}"
+            foreach: "@{triggerOutputs()?['attachments']}"
+            onFailure: Continue
+
+          - kind: SetVariableAction
+            name: Store filing path
+            inputs:
+              variable: filingPath
+              value: "@{outputs('Create folder for thread')?['Path']}"
+
+        falseBranch: []
+
+      - kind: SetVariableAction
+        name: Finalize digest entry
+        inputs:
+          variable: digestEntry
+          value:
+            messageId: "@{triggerOutputs()?['messageId']}"
+            receivedAt: "@{triggerOutputs()?['receivedDateTime']}"
+            subject: "@{triggerOutputs()?['subject']}"
+            from: "@{triggerOutputs()?['from']}"
+            priority: "@{variables('priority')}"
+            summary: "@{variables('summary')}"
+            filedTo: "@{variables('filingPath')}"
+            urgentAlertSent: "@{if(equals(variables('priority'), 'High') or equals(variables('priority'), 'Critical'), true, false)}"
+
+      - kind: ConnectorAction
+        name: Append entry to digest log
+        connector: sharepointonline
+        operation: CreateItem
+        connectionReference: triage_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('triage_AttachmentSiteUrl')}"
+          listName: Daily Digest Log
+          item:
+            Title: "@{triggerOutputs()?['subject']}"
+            FromAddress: "@{triggerOutputs()?['from']}"
+            Priority: "@{variables('priority')}"
+            Summary: "@{variables('summary')}"
+            FiledPath: "@{variables('filingPath')}"
+            ReceivedDateTime: "@{triggerOutputs()?['receivedDateTime']}"
+            UrgentAlertSent: "@{variables('digestEntry')['urgentAlertSent']}"
+        onFailure: Continue
+
+      - kind: TerminateAction
+        name: End — real-time
+        status: Succeeded
+
+  - kind: WorkflowDefinition
+    id: email-daily-digest
+    displayName: Email Triage — Daily Digest
+    description: Scheduled daily summary of all triaged emails.
+    status: Active
+    trigger:
+      kind: BuiltInTrigger
+      type: Recurrence
+      displayName: Daily digest schedule
+      inputs:
+        frequency: Day
+        interval: 1
+        startTime: "2026-09-02T18:00:00Z"
+        timeZone: UTC
+
+    variables:
+      - name: digestRows
+        type: Array
+        default: []
+      - name: stats
+        type: Object
+        default:
+          total: 0
+          critical: 0
+          high: 0
+          medium: 0
+          low: 0
+
+    actions:
+      - kind: ConnectorAction
+        name: Get todays log entries
+        connector: sharepointonline
+        operation: GetItems
+        connectionReference: triage_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('triage_AttachmentSiteUrl')}"
+          listName: Daily Digest Log
+          filterQuery: "ReceivedDateTime ge datetime'@{formatDateTime(addHours(utcNow(), -24), 'yyyy-MM-ddTHH:mm:ssZ')}'"
+          orderBy: Priority desc, ReceivedDateTime desc
+          top: 500
+
+      - kind: SetVariableAction
+        name: Build stats
+        inputs:
+          variable: stats
+          value:
+            total: "@{length(outputs('Get todays log entries')?['body/value'])}"
+            critical: "@{length(filter(outputs('Get todays log entries')?['body/value'], lambda(item, equals(item?['Priority'], 'Critical'))))}"
+            high: "@{length(filter(outputs('Get todays log entries')?['body/value'], lambda(item, equals(item?['Priority'], 'High'))))}"
+            medium: "@{length(filter(outputs('Get todays log entries')?['body/value'], lambda(item, equals(item?['Priority'], 'Medium'))))}"
+            low: "@{length(filter(outputs('Get todays log entries')?['body/value'], lambda(item, equals(item?['Priority'], 'Low'))))}"
+
+      - kind: PromptAction
+        name: Generate digest narrative
+        model: claude-opus-5
+        prompt: |-
+          You are writing a one-paragraph daily digest for a shared inbox operations team.
+          Use only the data below. Mention total volume, the highest-priority items, and
+          any notable pattern. Keep it under 120 words.
+
+          Stats: @{json(variables('stats'))}
+          Top 5 items:
+          @{join(map(take(outputs('Get todays log entries')?['body/value'], 5), lambda(item, concat(item?['Priority'], ' — ', item?['Title'], ' (', item?['FromAddress'], ')'))), '\n')}
+        output:
+          name: narrative
+          type: String
+        onFailure: Continue
+        fallbackValue: |
+          Daily digest: @{variables('stats')['total']} emails processed in the last 24 hours.
+
+      - kind: ConnectorAction
+        name: Send digest email
+        connector: office365
+        operation: SendEmailV2
+        connectionReference: triage_ExchangeOnlineConnection
+        inputs:
+          to: "@{environmentVariables('triage_UrgencyAssigneeEmail')}"
+          subject: "Daily Inbox Digest — @{variables('stats')['total']} emails, @{variables('stats')['critical']} critical"
+          body: |
+            <h2>Shared Inbox Digest</h2>
+            <p>@{outputs('Generate digest narrative')?['narrative']}</p>
+            <table>
+              <tr><th>Priority</th><th>Count</th></tr>
+              <tr><td>Critical</td><td>@{variables('stats')['critical']}</td></tr>
+              <tr><td>High</td><td>@{variables('stats')['high']}</td></tr>
+              <tr><td>Medium</td><td>@{variables('stats')['medium']}</td></tr>
+              <tr><td>Low</td><td>@{variables('stats')['low']}</td></tr>
+            </table>
+            <p>Full log: @{environmentVariables('triage_AttachmentSiteUrl')}/Lists/DailyDigestLog</p>
+
+      - kind: TerminateAction
+        name: End — digest
+        status: Succeeded

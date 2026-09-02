@@ -1,0 +1,636 @@
+# Microsoft Copilot Studio Workflow — Document Approval: AI Pre-check + Human Sign-off
+# Template: cliagent-workflow-1.0.0
+# Price: $79 · Complexity: Advanced · Connectors: Standard
+# Pairs with: legal-compliance-agent.yaml
+#
+# Import note: This YAML is an AgentSchema-aligned workflow specification.
+# Copilot Studio currently imports workflows via unmanaged solution .zip or
+# the visual designer. Use this file as the build blueprint, then export the
+# resulting workflow as a solution for distribution.
+
+kind: BotDefinition
+components:
+  - kind: BotSettingsComponent
+    settings:
+      kind: DefaultFeedbackCollection
+
+  - kind: KnowledgeSourceComponent
+    displayName: Legal-Policy-SharePoint
+    description: |
+      Provides access to legal and compliance policies used by the Document
+      Approval workflow for threshold rules and exception handling.
+    configuration:
+      kind: KnowledgeSourceConfiguration
+      source:
+        kind: SharePointKnowledgeSource
+        siteUrl: https://<COMPANY>.sharepoint.com/sites/Legal-Compliance
+        targetKind: Site
+
+tity:
+  kind: BotEntity
+  displayName: Document Approval Workflow
+  teamsAppInformation:
+    kind: ApplicationDetails
+    teams:
+      kind: TeamsApplicationDetails
+      lobDisplayName: Document Approval — AI Pre-check + Human Sign-off
+      shortDescription: Automates document review with AI extraction, policy checks, and human sign-off.
+      longDescription: |
+        Automates review of invoices, purchase orders, expense reports, and
+        contracts. Extracts key fields with AI, validates them against policy
+        thresholds, auto-approves routine items, and escalates exceptions to
+        humans via Teams adaptive cards and Outlook notifications. Writes a
+        full audit trail to a SharePoint list.
+      accentColor: "#5c2d91"
+  configuration:
+    kind: BotConfiguration
+    channels:
+      - kind: ChannelDefinition
+        id: Microsoft365Copilot
+        channelId: Microsoft365Copilot
+      - kind: ChannelDefinition
+        id: MsTeams
+        channelId: MsTeams
+    recognizer:
+      kind: CLICopilotRecognizer
+    agentSettings:
+      kind: AgentSettings
+      version: "1.0"
+      model:
+        series: claude-opus-5
+      instructions:
+        segments:
+          - kind: StaticSegment
+            value: |-
+              # Purpose
+              You are the conversational interface for the Document Approval
+              workflow. Employees can submit a document for approval, ask about
+              the status of a pending approval, or request the audit trail for a
+              completed review.
+
+              # General Guidelines
+              - Use only information from the connected SharePoint audit log and
+                the workflow run history.
+              - Do not invent approval statuses, approver names, or amounts.
+              - If a document is not found in the audit log, say so and suggest
+                the user check the SharePoint list directly.
+              - For policy questions, reference the connected Legal-Compliance
+                knowledge source.
+
+              # Response Format
+              - **Document:** file name / document type
+              - **Status:** Pending / Approved / Rejected / Exception
+              - **Approver:** name or "AI auto-approval"
+              - **Source:** SharePoint audit log entry
+      enableMemory: true
+      web:
+        kind: WebSettings
+        enableWebSearch: false
+  publishedOn: 2026-09-02T00:00:00Z
+  synchronizationStatus:
+    kind: BotSynchronizationDetails
+    contentVersion: 2
+  template: cliagent-workflow-1.0.0
+
+environmentVariables:
+  - kind: EnvironmentVariableDefinition
+    displayName: Approval Threshold Low
+    schemaName: docapproval_ThresholdLow
+    type: Number
+    defaultValue: "500"
+    description: Amount below which routine items may be AI-approved.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Approval Threshold High
+    schemaName: docapproval_ThresholdHigh
+    type: Number
+    defaultValue: "5000"
+    description: Amount above which human review is always required.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Default Currency
+    schemaName: docapproval_DefaultCurrency
+    type: String
+    defaultValue: USD
+    description: Currency code used when the document does not specify one.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Audit SharePoint Site URL
+    schemaName: docapproval_AuditSiteUrl
+    type: String
+    defaultValue: https://<COMPANY>.sharepoint.com/sites/Legal-Compliance
+    description: SharePoint site containing the document audit log list.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Audit List Name
+    schemaName: docapproval_AuditListName
+    type: String
+    defaultValue: Document Approval Audit Log
+    description: SharePoint list where every approval outcome is written.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Approver Email
+    schemaName: docapproval_ApproverEmail
+    type: String
+    defaultValue: approvals@<COMPANY>.com
+    description: Default human approver or approver group email.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Teams Channel ID
+    schemaName: docapproval_TeamsChannelId
+    type: String
+    defaultValue: <TEAMS_CHANNEL_ID>
+    description: Teams channel for adaptive-card approval requests.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Document Library Path
+    schemaName: docapproval_DocumentLibraryPath
+    type: String
+    defaultValue: /sites/Legal-Compliance/DocumentLibrary
+    description: SharePoint document library monitored for new files.
+
+connectionReferences:
+  - kind: ConnectionReference
+    displayName: SharePoint Online
+    schemaName: docapproval_SharePointConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_sharepointonline
+    description: Connection for audit logging and document library access.
+
+  - kind: ConnectionReference
+    displayName: Exchange Online
+    schemaName: docapproval_ExchangeOnlineConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_office365
+    description: Connection for email notifications and attachment ingestion.
+
+  - kind: ConnectionReference
+    displayName: Microsoft Teams
+    schemaName: docapproval_TeamsConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_teams
+    description: Connection for adaptive card approval requests.
+
+flows:
+  - kind: WorkflowDefinition
+    id: document-approval-main
+    displayName: Document Approval — Main Flow
+    description: Routes incoming documents through AI extraction, policy checks, and approvals.
+    status: Active
+
+    triggers:
+      - kind: ConnectorTrigger
+        id: trigger-email
+        displayName: When email with attachment arrives
+        type: Event
+        connector: office365
+        operation: OnNewEmailV3
+        connectionReference: docapproval_ExchangeOnlineConnection
+        inputs:
+          folderPath: Inbox
+          to: approvals@<COMPANY>.com
+          includeAttachments: true
+          subjectFilter: null
+        outputs:
+          messageId: string
+          subject: string
+          from: string
+          receivedDateTime: dateTime
+          attachments: array
+
+      - kind: ConnectorTrigger
+        id: trigger-sharepoint
+        displayName: When file is created in SharePoint
+        type: Event
+        connector: sharepointonline
+        operation: OnNewFile
+        connectionReference: docapproval_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('docapproval_AuditSiteUrl')}"
+          libraryName: Documents
+          folderPath: /Incoming
+        outputs:
+          fileId: string
+          fileName: string
+          filePath: string
+          createdDateTime: dateTime
+
+      - kind: AgentTrigger
+        id: trigger-agent
+        displayName: When agent submits document
+        type: AgentConversation
+        inputs:
+          documentReference: string
+          documentTypeHint: string
+          submittedBy: string
+        outputs:
+          documentReference: string
+          documentTypeHint: string
+          submittedBy: string
+
+    variables:
+      - name: documentContent
+        type: String
+        default: ""
+      - name: extractedFields
+        type: Object
+        default:
+          docType: unknown
+          vendor: ""
+          amount: 0
+          currency: "@{environmentVariables('docapproval_DefaultCurrency')}"
+          date: ""
+          confidence: 0
+      - name: approvalPath
+        type: String
+        default: unknown
+      - name: aiDecision
+        type: String
+        default: ""
+      - name: humanDecision
+        type: Object
+        default:
+          outcome: ""
+          comment: ""
+          reviewer: ""
+      - name: finalOutcome
+        type: String
+        default: Pending
+
+    actions:
+      - kind: ConditionAction
+        name: Route by trigger
+        condition:
+          operator: equals
+          left: "@{triggerType()}"
+          right: trigger-email
+        trueBranch:
+          - kind: ConnectorAction
+            name: Get attachment content
+            connector: office365
+            operation: GetAttachment
+            connectionReference: docapproval_ExchangeOnlineConnection
+            inputs:
+              messageId: "@{triggerOutputs()?['messageId']}"
+              attachmentId: "@{first(triggerOutputs()?['attachments'])?['id']}"
+            outputs:
+              contentBytes: string
+              name: string
+
+          - kind: SetVariableAction
+            name: Set document from email
+            inputs:
+              variable: documentContent
+              value: "@{base64ToString(outputs('Get attachment content')?['contentBytes'])}"
+
+          - kind: SetVariableAction
+            name: Set source metadata email
+            inputs:
+              variable: extractedFields
+              value:
+                docType: "@{triggerOutputs()?['subject']}"
+                source: email
+                submittedBy: "@{triggerOutputs()?['from']}"
+                receivedAt: "@{triggerOutputs()?['receivedDateTime']}"
+
+        falseBranch:
+          - kind: ConditionAction
+            name: Was it SharePoint?
+            condition:
+              operator: equals
+              left: "@{triggerType()}"
+              right: trigger-sharepoint
+            trueBranch:
+              - kind: ConnectorAction
+                name: Get file content
+                connector: sharepointonline
+                operation: GetFileContent
+                connectionReference: docapproval_SharePointConnection
+                inputs:
+                  siteAddress: "@{environmentVariables('docapproval_AuditSiteUrl')}"
+                  fileId: "@{triggerOutputs()?['fileId']}"
+                outputs:
+                  contentBytes: string
+
+              - kind: SetVariableAction
+                name: Set document from SharePoint
+                inputs:
+                  variable: documentContent
+                  value: "@{base64ToString(outputs('Get file content')?['contentBytes'])}"
+
+              - kind: SetVariableAction
+                name: Set source metadata SharePoint
+                inputs:
+                  variable: extractedFields
+                  value:
+                    docType: "@{triggerOutputs()?['fileName']}"
+                    source: sharepoint
+                    submittedBy: "System"
+                    receivedAt: "@{triggerOutputs()?['createdDateTime']}"
+
+            falseBranch:
+              - kind: ConnectorAction
+                name: Get file from agent reference
+                connector: sharepointonline
+                operation: GetFileMetadata
+                connectionReference: docapproval_SharePointConnection
+                inputs:
+                  siteAddress: "@{environmentVariables('docapproval_AuditSiteUrl')}"
+                  fileId: "@{triggerOutputs()?['documentReference']}"
+
+              - kind: SetVariableAction
+                name: Set document from agent
+                inputs:
+                  variable: extractedFields
+                  value:
+                    docType: "@{triggerOutputs()?['documentTypeHint']}"
+                    source: agent
+                    submittedBy: "@{triggerOutputs()?['submittedBy']}"
+                    receivedAt: "@{utcNow()}"
+
+      - kind: PromptAction
+        name: Extract document fields
+        model: claude-opus-5
+        prompt: |-
+          Extract structured fields from the document below. Respond ONLY with a
+          JSON object containing these keys: docType, vendor, amount, currency,
+          date, confidence.
+
+          docType must be one of: invoice, purchase_order, expense_report, contract.
+          vendor is the vendor, employee, or counterparty name.
+          amount is a number (no currency symbol).
+          currency is a 3-letter ISO code; default to @{environmentVariables('docapproval_DefaultCurrency')} if absent.
+          date is the document date in ISO-8601 format (YYYY-MM-DD).
+          confidence is an integer 0–100 estimating extraction certainty.
+
+          Document:
+          @{variables('documentContent')}
+        output:
+          name: fields
+          type: Object
+          schema:
+            docType: string
+            vendor: string
+            amount: number
+            currency: string
+            date: string
+            confidence: number
+        onFailure:
+          action: SetVariableAction
+          inputs:
+            variable: extractedFields
+            value:
+              docType: unknown
+              vendor: ""
+              amount: 0
+              currency: "@{environmentVariables('docapproval_DefaultCurrency')}"
+              date: ""
+              confidence: 0
+
+      - kind: SetVariableAction
+        name: Store extracted fields
+        inputs:
+          variable: extractedFields
+          value: "@{coalesce(outputs('Extract document fields')?['fields'], variables('extractedFields'))}"
+
+      - kind: ConditionAction
+        name: Recognized document type?
+        condition:
+          operator: notEquals
+          left: "@{variables('extractedFields')?['docType']}"
+          right: unknown
+        trueBranch: []
+        falseBranch:
+          - kind: RequestForInformationAction
+            name: RFI — unclear document type
+            title: Document type unclear
+            assignedTo: "@{environmentVariables('docapproval_ApproverEmail')}"
+            details: |
+              The AI could not determine the document type.
+              File/subject: @{variables('extractedFields')?['docType']}
+              Please classify this document.
+            responseOptions:
+              - invoice
+              - purchase_order
+              - expense_report
+              - contract
+              - reject
+            output:
+              name: rfiDocType
+              type: String
+
+          - kind: SetVariableAction
+            name: Apply RFI doc type
+            inputs:
+              variable: extractedFields
+              value:
+                docType: "@{outputs('RFI — unclear document type')?['rfiDocType']}"
+
+      - kind: ConditionAction
+        name: Choose approval path
+        condition:
+          operator: or
+          operands:
+            - operator: equals
+              left: "@{variables('extractedFields')?['docType']}"
+              right: contract
+            - operator: greaterOrEquals
+              left: "@{float(variables('extractedFields')?['amount'])}"
+              right: "@{float(environmentVariables('docapproval_ThresholdHigh'))}"
+            - operator: lessThan
+              left: "@{int(variables('extractedFields')?['confidence'])}"
+              right: "70"
+        trueBranch:
+          - kind: SetVariableAction
+            name: Set path — human review
+            inputs:
+              variable: approvalPath
+              value: human
+        falseBranch:
+          - kind: ConditionAction
+            name: AI approval eligible?
+            condition:
+              operator: lessOrEquals
+              left: "@{float(variables('extractedFields')?['amount'])}"
+              right: "@{float(environmentVariables('docapproval_ThresholdLow'))}"
+            trueBranch:
+              - kind: SetVariableAction
+                name: Set path — AI approve
+                inputs:
+                  variable: approvalPath
+                  value: ai
+            falseBranch:
+              - kind: SetVariableAction
+                name: Set path — human review
+                inputs:
+                  variable: approvalPath
+                  value: human
+
+      - kind: ConditionAction
+        name: Execute approval path
+        condition:
+          operator: equals
+          left: "@{variables('approvalPath')}"
+          right: ai
+        trueBranch:
+          - kind: AIApprovalAction
+            name: AI approval decision
+            criteria: |
+              Approve this document ONLY if all are true:
+              - Document type is invoice, purchase_order, or expense_report.
+              - Amount is <= $@{environmentVariables('docapproval_ThresholdLow')}.
+              - Confidence >= 70.
+              - No obvious policy anomalies.
+              Otherwise reject.
+            inputs:
+              document: "@{variables('documentContent')}"
+              fields: "@{json(variables('extractedFields'))}"
+            outputs:
+              name: decision
+              type: String
+              expectedValues: [Approved, Rejected]
+            onFailure:
+              action: SetVariableAction
+              inputs:
+                variable: aiDecision
+                value: Rejected
+
+          - kind: SetVariableAction
+            name: Store AI outcome
+            inputs:
+              variable: finalOutcome
+              value: "@{outputs('AI approval decision')?['decision']}"
+
+        falseBranch:
+          - kind: ConnectorAction
+            name: Send Teams adaptive card
+            connector: teams
+            operation: PostAdaptiveCardAndWaitForResponse
+            connectionReference: docapproval_TeamsConnection
+            inputs:
+              teamId: <TEAMS_TEAM_ID>
+              channelId: "@{environmentVariables('docapproval_TeamsChannelId')}"
+              adaptiveCard:
+                type: AdaptiveCard
+                version: "1.5"
+                body:
+                  - type: TextBlock
+                    text: "Document awaiting approval"
+                    weight: Bolder
+                    size: Medium
+                  - type: FactSet
+                    facts:
+                      - title: Type
+                        value: "@{variables('extractedFields')?['docType']}"
+                      - title: Vendor
+                        value: "@{variables('extractedFields')?['vendor']}"
+                      - title: Amount
+                        value: "@{variables('extractedFields')?['currency']} @{variables('extractedFields')?['amount']}"
+                      - title: Date
+                        value: "@{variables('extractedFields')?['date']}"
+                      - title: Submitted by
+                        value: "@{variables('extractedFields')?['submittedBy']}"
+                actions:
+                  - type: Action.Submit
+                    title: Approve
+                    data:
+                      outcome: Approved
+                  - type: Action.Submit
+                    title: Reject
+                    data:
+                      outcome: Rejected
+                  - type: Action.Submit
+                    title: Request Info
+                    data:
+                      outcome: RFI
+            outputs:
+              response: object
+
+          - kind: SetVariableAction
+            name: Store human decision
+            inputs:
+              variable: humanDecision
+              value: "@{outputs('Send Teams adaptive card')?['response']}"
+
+          - kind: ConditionAction
+            name: Needs RFI?
+            condition:
+              operator: equals
+              left: "@{variables('humanDecision')?['outcome']}"
+              right: RFI
+            trueBranch:
+              - kind: RequestForInformationAction
+                name: RFI — missing information
+                title: Additional information needed
+                assignedTo: "@{environmentVariables('docapproval_ApproverEmail')}"
+                details: |
+                  The reviewer requested more information for this document:
+                  Type: @{variables('extractedFields')?['docType']}
+                  Vendor: @{variables('extractedFields')?['vendor']}
+                  Amount: @{variables('extractedFields')?['currency']} @{variables('extractedFields')?['amount']}
+                responseOptions:
+                  - Approve
+                  - Reject
+                output:
+                  name: rfiOutcome
+                  type: Object
+
+              - kind: SetVariableAction
+                name: Apply RFI outcome
+                inputs:
+                  variable: humanDecision
+                  value: "@{outputs('RFI — missing information')?['rfiOutcome']}"
+
+            falseBranch: []
+
+          - kind: SetVariableAction
+            name: Store final human outcome
+            inputs:
+              variable: finalOutcome
+              value: "@{variables('humanDecision')?['outcome']}"
+
+      - kind: ConnectorAction
+        name: Send outcome email
+        connector: office365
+        operation: SendEmailV2
+        connectionReference: docapproval_ExchangeOnlineConnection
+        inputs:
+          to: "@{variables('extractedFields')?['submittedBy']}"
+          subject: "Document Approval: @{variables('finalOutcome')} — @{variables('extractedFields')?['docType']}"
+          body: |
+            Your document has been reviewed.
+
+            Document type: @{variables('extractedFields')?['docType']}
+            Vendor: @{variables('extractedFields')?['vendor']}
+            Amount: @{variables('extractedFields')?['currency']} @{variables('extractedFields')?['amount']}
+            Outcome: @{variables('finalOutcome')}
+            Reviewer: @{if(equals(variables('approvalPath'), 'ai'), 'AI auto-approval', variables('humanDecision')?['reviewer'])}
+            Comment: @{variables('humanDecision')?['comment']}
+
+            Audit entry: @{environmentVariables('docapproval_AuditSiteUrl')}/Lists/@{environmentVariables('docapproval_AuditListName')}
+        onFailure: Continue
+
+      - kind: ConnectorAction
+        name: Write audit log
+        connector: sharepointonline
+        operation: CreateItem
+        connectionReference: docapproval_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('docapproval_AuditSiteUrl')}"
+          listName: "@{environmentVariables('docapproval_AuditListName')}"
+          item:
+            Title: "@{variables('extractedFields')?['docType']} — @{variables('extractedFields')?['vendor']}"
+            DocumentType: "@{variables('extractedFields')?['docType']}"
+            Vendor: "@{variables('extractedFields')?['vendor']}"
+            Amount: "@{variables('extractedFields')?['amount']}"
+            Currency: "@{variables('extractedFields')?['currency']}"
+            DocumentDate: "@{variables('extractedFields')?['date']}"
+            SubmittedBy: "@{variables('extractedFields')?['submittedBy']}"
+            ApprovalPath: "@{variables('approvalPath')}"
+            Outcome: "@{variables('finalOutcome')}"
+            Reviewer: "@{if(equals(variables('approvalPath'), 'ai'), 'AI auto-approval', variables('humanDecision')?['reviewer'])}"
+            ReviewComment: "@{variables('humanDecision')?['comment']}"
+            Confidence: "@{variables('extractedFields')?['confidence']}"
+            ProcessedAt: "@{utcNow()}"
+        onFailure: Terminate
+
+      - kind: TerminateAction
+        name: End — document approval
+        status: Succeeded

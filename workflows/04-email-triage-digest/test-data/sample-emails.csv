@@ -1,0 +1,6 @@
+priority,from,subject,body_preview,expected_action
+Critical,legal@contoso.com,"URGENT: Service outage affecting payroll","Our payroll system is down. Employees must be paid today. Please escalate immediately.","Teams alert + email assignee"
+High,support@acme-corp.com,"Invoice #4482 overdue — vendor threatening hold","Acme is placing our account on hold unless the $8,200 invoice is paid by Friday.","Teams alert + email assignee"
+Medium,hr@company.com,"Updated remote-work policy attached","Please review the attached policy and share feedback by end of week.","Add to digest"
+Low,noreply@newsletter.com,"Weekly industry roundup","Top 10 stories this week in enterprise SaaS.","File + archive"
+Critical,ceo@company.com,"Board meeting materials — need review today","Please review the Q3 board deck today. Critical for tomorrow's meeting.","Teams alert + email assignee"
