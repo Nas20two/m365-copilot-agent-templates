@@ -1,0 +1,51 @@
+workflow:
+  number: 03
+  slug: hr-onboarding
+  display_name: "HR Onboarding Automation"
+  price: 79
+  complexity: advanced
+  pairs_with: [onboarding-buddy-agent, hr-policy-agent]
+  min_copilot_studio_version: "2026.08"
+  standard_connectors: [sharepoint, outlook, planner, teams]
+  uses_ai_approval: false
+  uses_premium_connectors: false
+
+deliverables:
+  workflow_zip:
+    source: src/workflow/export.zip
+    output: deliverables/03-hr-onboarding-workflow.zip
+  agent_yaml:
+    source: src/agent/paired-agent.yaml
+    output: deliverables/03-hr-onboarding-agent.yaml
+  setup_guide:
+    source: src/docs/03-hr-onboarding-setup-guide.md
+    output: deliverables/03-hr-onboarding-setup-guide.md
+  test_data:
+    source: src/test-data/hr-test-data/
+    output: deliverables/03-hr-onboarding-test-data/
+  video_script:
+    source: src/video/script.md
+    output: deliverables/03-hr-onboarding-video-script.md
+
+versioning:
+  current: 1.0.0
+  changelog_entry: "Initial release"
+
+env_vars:
+  - name: hr_NewHiresListName
+    description: "SharePoint list or form response source for new hires"
+    example: "New Hires"
+  - name: hr_SiteUrl
+    description: "SharePoint site containing the new-hires list"
+    example: "https://contoso.sharepoint.com/sites/HR"
+  - name: hr_WelcomeSenderEmail
+    description: "Email address sending welcome emails"
+    example: "hr@contoso.com"
+  - name: hr_ITContactEmail
+    description: "IT contact for equipment-provisioning tasks"
+    example: "it-provisioning@contoso.com"
+
+bundle_memberships:
+  - starter-pack: false
+  - core-three: true
+  - enterprise: true

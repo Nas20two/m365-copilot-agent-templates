@@ -1,0 +1,54 @@
+workflow:
+  number: 02
+  slug: it-ticket-triage
+  display_name: "IT Ticket Triage & Escalation"
+  price: 49
+  complexity: mid
+  pairs_with: [it-helpdesk-agent]
+  min_copilot_studio_version: "2026.08"
+  standard_connectors: [sharepoint, outlook, teams]
+  uses_ai_approval: false
+  uses_premium_connectors: false
+
+deliverables:
+  workflow_zip:
+    source: src/workflow/export.zip
+    output: deliverables/02-it-ticket-triage-workflow.zip
+  agent_yaml:
+    source: src/agent/paired-agent.yaml
+    output: deliverables/02-it-ticket-triage-agent.yaml
+  setup_guide:
+    source: src/docs/02-it-ticket-triage-setup-guide.md
+    output: deliverables/02-it-ticket-triage-setup-guide.md
+  test_data:
+    source: src/test-data/it-test-data/
+    output: deliverables/02-it-ticket-triage-test-data/
+  video_script:
+    source: src/video/script.md
+    output: deliverables/02-it-ticket-triage-video-script.md
+
+versioning:
+  current: 1.0.0
+  changelog_entry: "Initial release"
+
+env_vars:
+  - name: helpdesk_MailboxAddress
+    description: "Helpdesk mailbox address"
+    example: "helpdesk@contoso.com"
+  - name: helpdesk_TeamsTeamId
+    description: "Teams team ID for helpdesk channel"
+    example: "<TEAMS_TEAM_ID>"
+  - name: helpdesk_TeamsChannelId
+    description: "Teams channel ID for ticket notifications"
+    example: "<TEAMS_CHANNEL_ID>"
+  - name: helpdesk_TicketsListName
+    description: "SharePoint list where tickets are created"
+    example: "IT Tickets"
+  - name: helpdesk_SiteUrl
+    description: "SharePoint site for ticket list"
+    example: "https://contoso.sharepoint.com/sites/IT"
+
+bundle_memberships:
+  - starter-pack: false
+  - core-three: true
+  - enterprise: true

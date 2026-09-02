@@ -1,0 +1,51 @@
+workflow:
+  number: 05
+  slug: compliance-validation
+  display_name: "Compliance Document Validation"
+  price: 99
+  complexity: advanced
+  pairs_with: [legal-compliance-agent]
+  min_copilot_studio_version: "2026.08"
+  standard_connectors: [sharepoint, outlook, teams]
+  uses_ai_approval: true
+  uses_premium_connectors: false
+
+deliverables:
+  workflow_zip:
+    source: src/workflow/export.zip
+    output: deliverables/05-compliance-validation-workflow.zip
+  agent_yaml:
+    source: src/agent/paired-agent.yaml
+    output: deliverables/05-compliance-validation-agent.yaml
+  setup_guide:
+    source: src/docs/05-compliance-validation-setup-guide.md
+    output: deliverables/05-compliance-validation-setup-guide.md
+  test_data:
+    source: src/test-data/compliance-test-data/
+    output: deliverables/05-compliance-validation-test-data/
+  video_script:
+    source: src/video/script.md
+    output: deliverables/05-compliance-validation-video-script.md
+
+versioning:
+  current: 1.0.0
+  changelog_entry: "Initial release"
+
+env_vars:
+  - name: compliance_LibraryUrl
+    description: "SharePoint document library URL for compliance uploads"
+    example: "https://contoso.sharepoint.com/sites/Compliance/Documents"
+  - name: compliance_AuditListName
+    description: "SharePoint list for validation audit trail"
+    example: "Compliance Validation Log"
+  - name: compliance_LegalReviewerEmail
+    description: "Legal/compliance reviewer email"
+    example: "legal@contoso.com"
+  - name: compliance_RiskThreshold
+    description: "Risk score threshold above which human review is required"
+    example: "50"
+
+bundle_memberships:
+  - starter-pack: true
+  - core-three: false
+  - enterprise: true
