@@ -26,7 +26,7 @@ components:
         siteUrl: https://<COMPANY>.sharepoint.com/sites/Legal-Compliance
         targetKind: Site
 
-tity:
+entity:
   kind: BotEntity
   displayName: Document Approval Workflow
   teamsAppInformation:
@@ -57,7 +57,7 @@ tity:
       kind: AgentSettings
       version: "1.0"
       model:
-        series: claude-opus-5
+        series: gpt-4o
       instructions:
         segments:
           - kind: StaticSegment
@@ -134,6 +134,13 @@ environmentVariables:
     type: String
     defaultValue: approvals@<COMPANY>.com
     description: Default human approver or approver group email.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Teams Team ID
+    schemaName: docapproval_TeamsTeamId
+    type: String
+    defaultValue: <TEAMS_TEAM_ID>
+    description: Microsoft Teams team ID containing the approval channel.
 
   - kind: EnvironmentVariableDefinition
     displayName: Teams Channel ID
@@ -258,14 +265,14 @@ flows:
       - kind: ConditionAction
         name: Route by trigger
         condition:
-          operator: equals
-          left: "@{triggerType()}"
-          right: trigger-email
+          operator: notEquals
+          left: "@{coalesce(triggerOutputs()?['messageId'], '')}"
+          right: ""
         trueBranch:
           - kind: ConnectorAction
             name: Get attachment content
             connector: office365
-            operation: GetAttachment
+            operation: GetAttachmentV2
             connectionReference: docapproval_ExchangeOnlineConnection
             inputs:
               messageId: "@{triggerOutputs()?['messageId']}"
@@ -294,9 +301,9 @@ flows:
           - kind: ConditionAction
             name: Was it SharePoint?
             condition:
-              operator: equals
-              left: "@{triggerType()}"
-              right: trigger-sharepoint
+              operator: notEquals
+              left: "@{coalesce(triggerOutputs()?['fileId'], '')}"
+              right: ""
             trueBranch:
               - kind: ConnectorAction
                 name: Get file content
@@ -322,21 +329,29 @@ flows:
                   value:
                     docType: "@{triggerOutputs()?['fileName']}"
                     source: sharepoint
-                    submittedBy: "System"
+                    submittedBy: "@{environmentVariables('docapproval_ApproverEmail')}"
                     receivedAt: "@{triggerOutputs()?['createdDateTime']}"
 
             falseBranch:
               - kind: ConnectorAction
                 name: Get file from agent reference
                 connector: sharepointonline
-                operation: GetFileMetadata
+                operation: GetFileContent
                 connectionReference: docapproval_SharePointConnection
                 inputs:
                   siteAddress: "@{environmentVariables('docapproval_AuditSiteUrl')}"
                   fileId: "@{triggerOutputs()?['documentReference']}"
+                outputs:
+                  contentBytes: string
 
               - kind: SetVariableAction
                 name: Set document from agent
+                inputs:
+                  variable: documentContent
+                  value: "@{base64ToString(outputs('Get file from agent reference')?['contentBytes'])}"
+
+              - kind: SetVariableAction
+                name: Set source metadata agent
                 inputs:
                   variable: extractedFields
                   value:
@@ -347,7 +362,7 @@ flows:
 
       - kind: PromptAction
         name: Extract document fields
-        model: claude-opus-5
+        model: gpt-4o
         prompt: |-
           Extract structured fields from the document below. Respond ONLY with a
           JSON object containing these keys: docType, vendor, amount, currency,
@@ -470,19 +485,25 @@ flows:
           left: "@{variables('approvalPath')}"
           right: ai
         trueBranch:
-          - kind: AIApprovalAction
+          - kind: PromptAction
             name: AI approval decision
-            criteria: |
-              Approve this document ONLY if all are true:
+            model: gpt-4o
+            prompt: |-
+              You are an AI approver for routine business documents.
+              Review the document and extracted fields below. Decide ONLY
+              "Approved" or "Rejected". Approve ONLY if all are true:
               - Document type is invoice, purchase_order, or expense_report.
               - Amount is <= $@{environmentVariables('docapproval_ThresholdLow')}.
               - Confidence >= 70.
-              - No obvious policy anomalies.
+              - No obvious policy anomalies, missing dates, or suspicious amounts.
               Otherwise reject.
-            inputs:
-              document: "@{variables('documentContent')}"
-              fields: "@{json(variables('extractedFields'))}"
-            outputs:
+
+              Document:
+              @{variables('documentContent')}
+
+              Extracted fields:
+              @{json(variables('extractedFields'))}
+            output:
               name: decision
               type: String
               expectedValues: [Approved, Rejected]
@@ -502,10 +523,13 @@ flows:
           - kind: ConnectorAction
             name: Send Teams adaptive card
             connector: teams
-            operation: PostAdaptiveCardAndWaitForResponse
+            # VERIFY: Copilot Studio workflow operation name for posting an
+            # adaptive card and waiting for a response. Power Automate uses
+            # PostMessageToChannelV3 plus a separate approval/wait action.
+            operation: PostMessageToChannelV3
             connectionReference: docapproval_TeamsConnection
             inputs:
-              teamId: <TEAMS_TEAM_ID>
+              teamId: "@{environmentVariables('docapproval_TeamsTeamId')}"
               channelId: "@{environmentVariables('docapproval_TeamsChannelId')}"
               adaptiveCard:
                 type: AdaptiveCard

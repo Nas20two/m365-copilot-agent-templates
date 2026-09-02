@@ -18,3 +18,17 @@ Use these sample documents to validate the `Extract document fields` prompt node
 6. Trace each result through the `Choose approval path` condition.
 7. For the invoice, confirm the `AI approval decision` returns `Approved`.
 8. For the expense report and contract, confirm a Teams adaptive card is generated.
+
+## Required Environment Variables
+
+Before running tests, set:
+
+- `docapproval_ThresholdLow`
+- `docapproval_ThresholdHigh`
+- `docapproval_DefaultCurrency`
+- `docapproval_AuditSiteUrl`
+- `docapproval_AuditListName`
+- `docapproval_ApproverEmail`
+- `docapproval_TeamsTeamId`
+- `docapproval_TeamsChannelId`
+- `docapproval_DocumentLibraryPath`

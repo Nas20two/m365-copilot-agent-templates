@@ -43,7 +43,7 @@ entity:
       kind: AgentSettings
       version: "1.0"
       model:
-        series: claude-opus-5
+        series: gpt-4o
       instructions:
         segments:
           - kind: StaticSegment
@@ -98,11 +98,25 @@ environmentVariables:
     description: Document library where email attachments are saved.
 
   - kind: EnvironmentVariableDefinition
+    displayName: Teams Team ID
+    schemaName: triage_TeamsTeamId
+    type: String
+    defaultValue: <TEAMS_TEAM_ID>
+    description: Microsoft Teams team ID containing the notification channel.
+
+  - kind: EnvironmentVariableDefinition
     displayName: Teams Channel ID
     schemaName: triage_TeamsChannelId
     type: String
     defaultValue: <TEAMS_CHANNEL_ID>
     description: Teams channel where urgent items are posted.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Digest List Name
+    schemaName: triage_DigestListName
+    type: String
+    defaultValue: Daily Digest Log
+    description: SharePoint list where triage entries are logged for digest generation.
 
   - kind: EnvironmentVariableDefinition
     displayName: Urgency Assignee Email
@@ -210,7 +224,7 @@ flows:
 
       - kind: AIClassifyAction
         name: Classify email priority
-        model: claude-opus-5
+        model: gpt-4o
         prompt: |-
           You are an email triage assistant for a shared business inbox.
           Classify the email below into exactly one priority: Low, Medium, High, or Critical.
@@ -254,7 +268,7 @@ flows:
             operation: PostMessageToChannelV3
             connectionReference: triage_TeamsConnection
             inputs:
-              teamId: <TEAMS_TEAM_ID>
+              teamId: "@{environmentVariables('triage_TeamsTeamId')}"
               channelId: "@{environmentVariables('triage_TeamsChannelId')}"
               messageBody:
                 type: AdaptiveCard
@@ -301,7 +315,7 @@ flows:
         trueBranch:
           - kind: PromptAction
             name: Summarize long thread
-            model: claude-opus-5
+            model: gpt-4o
             prompt: |-
               Summarize the following email thread in @{environmentVariables('triage_SummaryWordLimit')} words or less.
               Capture: sender intent, key facts, requested actions, and any deadlines.
@@ -340,18 +354,22 @@ flows:
               folderPath: "/@{formatDateTime(triggerOutputs()?['receivedDateTime'], 'yyyy-MM-dd')}/@{triggerOutputs()?['conversationId']}"
             onFailure: Continue
 
-          - kind: ConnectorAction
+          - kind: LoopAction
             name: Save attachments to SharePoint
-            connector: sharepointonline
-            operation: CreateFile
-            connectionReference: triage_SharePointConnection
-            inputs:
-              siteAddress: "@{environmentVariables('triage_AttachmentSiteUrl')}"
-              folderPath: "@{outputs('Create folder for thread')?['Path']}"
-              fileName: "@{item()?['name']}"
-              fileContent: "@{item()?['contentBytes']}"
-            foreach: "@{triggerOutputs()?['attachments']}"
-            onFailure: Continue
+            type: ApplyToEach
+            items: "@{triggerOutputs()?['attachments']}"
+            actions:
+              - kind: ConnectorAction
+                name: Create file in thread folder
+                connector: sharepointonline
+                operation: CreateFile
+                connectionReference: triage_SharePointConnection
+                inputs:
+                  siteAddress: "@{environmentVariables('triage_AttachmentSiteUrl')}"
+                  folderPath: "@{outputs('Create folder for thread')?['Path']}"
+                  fileName: "@{item()?['name']}"
+                  fileContent: "@{item()?['contentBytes']}"
+                onFailure: Continue
 
           - kind: SetVariableAction
             name: Store filing path
@@ -382,7 +400,7 @@ flows:
         connectionReference: triage_SharePointConnection
         inputs:
           siteAddress: "@{environmentVariables('triage_AttachmentSiteUrl')}"
-          listName: Daily Digest Log
+          listName: "@{environmentVariables('triage_DigestListName')}"
           item:
             Title: "@{triggerOutputs()?['subject']}"
             FromAddress: "@{triggerOutputs()?['from']}"
@@ -433,7 +451,7 @@ flows:
         connectionReference: triage_SharePointConnection
         inputs:
           siteAddress: "@{environmentVariables('triage_AttachmentSiteUrl')}"
-          listName: Daily Digest Log
+          listName: "@{environmentVariables('triage_DigestListName')}"
           filterQuery: "ReceivedDateTime ge datetime'@{formatDateTime(addHours(utcNow(), -24), 'yyyy-MM-ddTHH:mm:ssZ')}'"
           orderBy: Priority desc, ReceivedDateTime desc
           top: 500
@@ -451,7 +469,7 @@ flows:
 
       - kind: PromptAction
         name: Generate digest narrative
-        model: claude-opus-5
+        model: gpt-4o
         prompt: |-
           You are writing a one-paragraph daily digest for a shared inbox operations team.
           Use only the data below. Mention total volume, the highest-priority items, and
@@ -485,7 +503,7 @@ flows:
               <tr><td>Medium</td><td>@{variables('stats')['medium']}</td></tr>
               <tr><td>Low</td><td>@{variables('stats')['low']}</td></tr>
             </table>
-            <p>Full log: @{environmentVariables('triage_AttachmentSiteUrl')}/Lists/DailyDigestLog</p>
+            <p>Full log: @{environmentVariables('triage_AttachmentSiteUrl')}/Lists/@{environmentVariables('triage_DigestListName')}</p>
 
       - kind: TerminateAction
         name: End — digest

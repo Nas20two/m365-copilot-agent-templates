@@ -19,3 +19,18 @@ Use these rows to validate the AI classify node after import.
 5. Paste each `body_preview` and `subject` into the test inputs.
 6. Assert the output matches the expected priority.
 7. Run an end-to-end test with one Critical and one Low email.
+
+## Required Environment Variables
+
+Before running tests, set:
+
+- `triage_MailboxAddress`
+- `triage_AttachmentSiteUrl`
+- `triage_AttachmentLibraryName`
+- `triage_TeamsTeamId`
+- `triage_TeamsChannelId`
+- `triage_DigestListName`
+- `triage_UrgencyAssigneeEmail`
+- `triage_DigestTimeUtc`
+- `triage_SummaryWordLimit`
+- `triage_BodyLengthThreshold`
