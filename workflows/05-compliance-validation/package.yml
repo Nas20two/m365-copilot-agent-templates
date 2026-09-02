@@ -44,6 +44,9 @@ env_vars:
   - name: compliance_RiskThreshold
     description: "Risk score threshold above which human review is required"
     example: "50"
+  - name: compliance_SiteUrl
+    description: "SharePoint site containing the compliance library and audit list"
+    example: "https://contoso.sharepoint.com/sites/Compliance"
 
 bundle_memberships:
   - starter-pack: true

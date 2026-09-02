@@ -1,0 +1,489 @@
+# Microsoft Copilot Studio Workflow — Compliance Document Validation
+# Template: cliagent-workflow-1.0.0
+# Price: $79–$99 · Complexity: Advanced · Connectors: Standard
+# Pairs with: legal-compliance-agent.yaml
+#
+# Import note: This YAML is an AgentSchema-aligned workflow specification.
+# Copilot Studio currently imports workflows via unmanaged solution .zip or
+# the visual designer. Use this file as the build blueprint, then export the
+# resulting workflow as a solution for distribution.
+
+kind: BotDefinition
+components:
+  - kind: BotSettingsComponent
+    settings:
+      kind: DefaultFeedbackCollection
+
+  - kind: KnowledgeSourceComponent
+    displayName: Compliance-Policy-SharePoint
+    description: |
+      Provides access to regulatory and company policy documents used by the
+      Compliance Document Validation workflow for risk scoring and remediation
+      rules.
+    configuration:
+      kind: KnowledgeSourceConfiguration
+      source:
+        kind: SharePointKnowledgeSource
+        siteUrl: https://<COMPANY>.sharepoint.com/sites/Compliance
+        targetKind: Site
+
+entity:
+  kind: BotEntity
+  displayName: Compliance Document Validation Workflow
+  teamsAppInformation:
+    kind: ApplicationDetails
+    teams:
+      kind: TeamsApplicationDetails
+      lobDisplayName: Compliance Document Validation
+      shortDescription: AI validation of documents against policy with audit-ready human review.
+      longDescription: |
+        Validates uploaded documents against regulatory and internal policy
+        guidelines. Categorizes violations by risk level, routes high and
+        medium-risk items to human legal review, auto-approves low-risk
+        documents, and maintains a complete audit trail.
+      accentColor: "#a4262c"
+  configuration:
+    kind: BotConfiguration
+    channels:
+      - kind: ChannelDefinition
+        id: Microsoft365Copilot
+        channelId: Microsoft365Copilot
+      - kind: ChannelDefinition
+        id: MsTeams
+        channelId: MsTeams
+    recognizer:
+      kind: CLICopilotRecognizer
+    agentSettings:
+      kind: AgentSettings
+      version: "1.0"
+      model:
+        series: gpt-4o
+      instructions:
+        segments:
+          - kind: StaticSegment
+            value: |-
+              # Purpose
+              You are the conversational interface for Compliance Document
+              Validation. Users can submit a document for validation, ask about
+              the status of a review, or request the audit trail for a document.
+
+              # General Guidelines
+              - Use only data from the connected compliance audit log and
+                workflow run history.
+              - Do not invent risk scores, reviewer names, or violations.
+              - For policy questions, reference the connected Compliance Policy
+                knowledge source.
+
+              # Response Format
+              - **Document:** file name / document type
+              - **Status:** Approved / Flagged / Under Review
+              - **Risk level:** Low / Medium / High
+              - **Reviewer:** AI auto-approval or reviewer name
+              - **Audit link:** SharePoint audit log entry
+      enableMemory: true
+      web:
+        kind: WebSettings
+        enableWebSearch: false
+  publishedOn: 2026-09-02T00:00:00Z
+  synchronizationStatus:
+    kind: BotSynchronizationDetails
+    contentVersion: 2
+  template: cliagent-workflow-1.0.0
+
+environmentVariables:
+  - kind: EnvironmentVariableDefinition
+    displayName: Compliance Library URL
+    schemaName: compliance_LibraryUrl
+    type: String
+    defaultValue: https://<COMPANY>.sharepoint.com/sites/Compliance/Documents
+    description: SharePoint document library monitored for compliance uploads.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Audit List Name
+    schemaName: compliance_AuditListName
+    type: String
+    defaultValue: Compliance Validation Log
+    description: SharePoint list where validation outcomes and audit trails are written.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Legal Reviewer Email
+    schemaName: compliance_LegalReviewerEmail
+    type: String
+    defaultValue: legal@<COMPANY>.onmicrosoft.com
+    description: Email address assigned to human review tasks for medium/high risk items.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Risk Threshold
+    schemaName: compliance_RiskThreshold
+    type: Number
+    defaultValue: "50"
+    description: Numeric risk score above which human review is required.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Compliance Site URL
+    schemaName: compliance_SiteUrl
+    type: String
+    defaultValue: https://<COMPANY>.sharepoint.com/sites/Compliance
+    description: SharePoint site containing the audit list and document library.
+
+connectionReferences:
+  - kind: ConnectionReference
+    displayName: SharePoint Online
+    schemaName: compliance_SharePointConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_sharepointonline
+    description: Connection for document library, audit log, and file metadata updates.
+
+  - kind: ConnectionReference
+    displayName: Exchange Online
+    schemaName: compliance_ExchangeOnlineConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_office365
+    description: Connection for reviewer notifications and status emails.
+
+flows:
+  - kind: WorkflowDefinition
+    id: compliance-validation-main
+    displayName: Compliance Validation — Main Flow
+    description: |
+      Triggered by a new file in the compliance library or by the Legal &
+      Compliance Agent. Validates the document, routes by risk, creates
+      remediation tasks, and writes the audit trail.
+    status: Active
+
+    triggers:
+      - kind: ConnectorTrigger
+        id: trigger-sharepoint
+        displayName: When a file is created in the compliance library
+        type: Event
+        connector: sharepointonline
+        operation: OnNewFile
+        connectionReference: compliance_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('compliance_SiteUrl')}"
+          libraryName: Documents
+          folderPath: /
+        outputs:
+          fileId: string
+          fileName: string
+          filePath: string
+          createdDateTime: dateTime
+
+      - kind: AgentTrigger
+        id: trigger-agent
+        displayName: When the Legal & Compliance Agent submits a document
+        type: AgentConversation
+        inputs:
+          documentReference: string
+          documentName: string
+          submittedBy: string
+        outputs:
+          documentReference: string
+          documentName: string
+          submittedBy: string
+
+    variables:
+      - name: documentContent
+        type: String
+        default: ""
+      - name: documentName
+        type: String
+        default: ""
+      - name: submittedBy
+        type: String
+        default: ""
+      - name: validationResult
+        type: Object
+        default:
+          riskScore: 0
+          riskLevel: Low
+          violations: []
+          remediation: ""
+      - name: reviewOutcome
+        type: Object
+        default:
+          outcome: ""
+          comment: ""
+          reviewer: ""
+      - name: finalStatus
+        type: String
+        default: Pending
+
+    actions:
+      - kind: ConditionAction
+        name: Route by trigger
+        condition:
+          operator: notEquals
+          left: "@{coalesce(triggerOutputs()?['fileId'], '')}"
+          right: ""
+        trueBranch:
+          - kind: ConnectorAction
+            name: Get file content from SharePoint
+            connector: sharepointonline
+            operation: GetFileContent
+            connectionReference: compliance_SharePointConnection
+            inputs:
+              siteAddress: "@{environmentVariables('compliance_SiteUrl')}"
+              fileId: "@{triggerOutputs()?['fileId']}"
+            outputs:
+              contentBytes: string
+
+          - kind: SetVariableAction
+            name: Set document from SharePoint
+            inputs:
+              variable: documentContent
+              value: "@{base64ToString(outputs('Get file content from SharePoint')?['contentBytes'])}"
+
+          - kind: SetVariableAction
+            name: Set metadata from SharePoint
+            inputs:
+              variable: documentName
+              value: "@{triggerOutputs()?['fileName']}"
+
+          - kind: SetVariableAction
+            name: Set submitter from SharePoint
+            inputs:
+              variable: submittedBy
+              value: "@{environmentVariables('compliance_LegalReviewerEmail')}"
+
+        falseBranch:
+          - kind: ConnectorAction
+            name: Get file content from agent reference
+            connector: sharepointonline
+            operation: GetFileContent
+            connectionReference: compliance_SharePointConnection
+            inputs:
+              siteAddress: "@{environmentVariables('compliance_SiteUrl')}"
+              fileId: "@{triggerOutputs()?['documentReference']}"
+            outputs:
+              contentBytes: string
+
+          - kind: SetVariableAction
+            name: Set document from agent
+            inputs:
+              variable: documentContent
+              value: "@{base64ToString(outputs('Get file content from agent reference')?['contentBytes'])}"
+
+          - kind: SetVariableAction
+            name: Set metadata from agent
+            inputs:
+              variable: documentName
+              value: "@{triggerOutputs()?['documentName']}"
+
+          - kind: SetVariableAction
+            name: Set submitter from agent
+            inputs:
+              variable: submittedBy
+              value: "@{triggerOutputs()?['submittedBy']}"
+
+      - kind: PromptAction
+        name: Validate document against policy
+        model: gpt-4o
+        prompt: |-
+          You are a compliance reviewer. Validate the document below against
+          standard regulatory and internal policy guidelines. Identify
+          violations, assign a risk score 0–100, and classify risk level as
+          Low (0–33), Medium (34–@{environmentVariables('compliance_RiskThreshold')}), or
+          High (@{environmentVariables('compliance_RiskThreshold')}+). Suggest remediation.
+
+          Document:
+          @{substring(variables('documentContent'), 0, min(length(variables('documentContent')), 12000))}
+
+          Respond ONLY with a JSON object containing:
+          {
+            "riskScore": number,
+            "riskLevel": "Low" | "Medium" | "High",
+            "violations": ["short description", ...],
+            "remediation": "actionable remediation guidance"
+          }
+        output:
+          name: validation
+          type: Object
+          schema:
+            riskScore: number
+            riskLevel: string
+            violations: array
+            remediation: string
+        onFailure:
+          action: SetVariableAction
+          inputs:
+            variable: validationResult
+            value:
+              riskScore: 0
+              riskLevel: Low
+              violations: []
+              remediation: "Validation could not be completed. Routed to human review."
+
+      - kind: SetVariableAction
+        name: Store validation result
+        inputs:
+          variable: validationResult
+          value: "@{coalesce(outputs('Validate document against policy')?['validation'], variables('validationResult'))}"
+
+      - kind: ConditionAction
+        name: Route by risk level
+        condition:
+          operator: equals
+          left: "@{variables('validationResult')?['riskLevel']}"
+          right: High
+        trueBranch:
+          - kind: RequestForInformationAction
+            name: Human review — high risk
+            title: "🚨 High-risk compliance review required"
+            assignedTo: "@{environmentVariables('compliance_LegalReviewerEmail')}"
+            details: |
+              Document: @{variables('documentName')}
+              Risk score: @{variables('validationResult')?['riskScore']}
+              Violations: @{join(variables('validationResult')?['violations'], '; ')}
+              Remediation: @{variables('validationResult')?['remediation']}
+            responseOptions:
+              - Approve
+              - Reject
+              - Request Info
+            output:
+              name: review
+              type: Object
+
+          - kind: SetVariableAction
+            name: Store high-risk review outcome
+            inputs:
+              variable: reviewOutcome
+              value: "@{outputs('Human review — high risk')?['review']}"
+
+          - kind: SetVariableAction
+            name: Set final status high risk
+            inputs:
+              variable: finalStatus
+              value: "@{variables('reviewOutcome')?['outcome']}"
+
+        falseBranch:
+          - kind: ConditionAction
+            name: Is medium risk?
+            condition:
+              operator: equals
+              left: "@{variables('validationResult')?['riskLevel']}"
+              right: Medium
+            trueBranch:
+              - kind: RequestForInformationAction
+                name: Human review — medium risk
+                title: "⚠️ Medium-risk compliance review required"
+                assignedTo: "@{environmentVariables('compliance_LegalReviewerEmail')}"
+                details: |
+                  Document: @{variables('documentName')}
+                  Risk score: @{variables('validationResult')?['riskScore']}
+                  Violations: @{join(variables('validationResult')?['violations'], '; ')}
+                  Remediation: @{variables('validationResult')?['remediation']}
+                responseOptions:
+                  - Approve
+                  - Reject
+                  - Request Info
+                output:
+                  name: review
+                  type: Object
+
+              - kind: SetVariableAction
+                name: Store medium-risk review outcome
+                inputs:
+                  variable: reviewOutcome
+                  value: "@{outputs('Human review — medium risk')?['review']}"
+
+              - kind: SetVariableAction
+                name: Set final status medium risk
+                inputs:
+                  variable: finalStatus
+                  value: "@{variables('reviewOutcome')?['outcome']}"
+
+            falseBranch:
+              - kind: SetVariableAction
+                name: Set final status auto-approved
+                inputs:
+                  variable: finalStatus
+                  value: Approved
+
+              - kind: ConnectorAction
+                name: Update file metadata to Approved
+                connector: sharepointonline
+                operation: UpdateFileProperties
+                connectionReference: compliance_SharePointConnection
+                inputs:
+                  siteAddress: "@{environmentVariables('compliance_SiteUrl')}"
+                  libraryName: Documents
+                  id: "@{coalesce(triggerOutputs()?['fileId'], triggerOutputs()?['documentReference'])}"
+                  fields:
+                    ComplianceStatus: Approved
+                    ComplianceReviewedAt: "@{utcNow()}"
+                    ComplianceReviewer: AI auto-approval
+                onFailure: Continue
+
+      - kind: ConditionAction
+        name: Has violations?
+        condition:
+          operator: greater
+          left: "@{length(variables('validationResult')?['violations'])}"
+          right: "0"
+        trueBranch:
+          - kind: ConnectorAction
+            name: Create remediation task
+            connector: sharepointonline
+            operation: CreateItem
+            connectionReference: compliance_SharePointConnection
+            inputs:
+              siteAddress: "@{environmentVariables('compliance_SiteUrl')}"
+              listName: "@{environmentVariables('compliance_AuditListName')}"
+              item:
+                Title: "Remediation: @{variables('documentName')}"
+                DocumentName: "@{variables('documentName')}"
+                RiskLevel: "@{variables('validationResult')?['riskLevel']}"
+                RiskScore: "@{variables('validationResult')?['riskScore']}"
+                Violations: "@{join(variables('validationResult')?['violations'], '; ')}"
+                Remediation: "@{variables('validationResult')?['remediation']}"
+                AssignedTo: "@{environmentVariables('compliance_LegalReviewerEmail')}"
+                Status: Open
+                ItemType: Remediation
+            onFailure: Continue
+        falseBranch: []
+
+      - kind: ConnectorAction
+        name: Write audit log
+        connector: sharepointonline
+        operation: CreateItem
+        connectionReference: compliance_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('compliance_SiteUrl')}"
+          listName: "@{environmentVariables('compliance_AuditListName')}"
+          item:
+            Title: "@{variables('documentName')}"
+            DocumentName: "@{variables('documentName')}"
+            SubmittedBy: "@{variables('submittedBy')}"
+            RiskLevel: "@{variables('validationResult')?['riskLevel']}"
+            RiskScore: "@{variables('validationResult')?['riskScore']}"
+            Violations: "@{join(variables('validationResult')?['violations'], '; ')}"
+            Remediation: "@{variables('validationResult')?['remediation']}"
+            Reviewer: "@{if(equals(variables('finalStatus'), 'Approved'), 'AI auto-approval', variables('reviewOutcome')?['reviewer'])}"
+            ReviewComment: "@{variables('reviewOutcome')?['comment']}"
+            FinalStatus: "@{variables('finalStatus')}"
+            ProcessedAt: "@{utcNow()}"
+            ItemType: Audit
+        onFailure: Terminate
+
+      - kind: ConnectorAction
+        name: Send outcome email
+        connector: office365
+        operation: SendEmailV2
+        connectionReference: compliance_ExchangeOnlineConnection
+        inputs:
+          to: "@{variables('submittedBy')}"
+          subject: "Compliance review: @{variables('documentName')} — @{variables('finalStatus')}"
+          body: |
+            Your document has completed compliance validation.
+
+            Document: @{variables('documentName')}
+            Risk level: @{variables('validationResult')?['riskLevel']}
+            Risk score: @{variables('validationResult')?['riskScore']}
+            Final status: @{variables('finalStatus')}
+            Reviewer: @{if(equals(variables('finalStatus'), 'Approved'), 'AI auto-approval', variables('reviewOutcome')?['reviewer'])}
+
+            Audit log: @{environmentVariables('compliance_SiteUrl')}/Lists/@{environmentVariables('compliance_AuditListName')}
+        onFailure: Continue
+
+      - kind: TerminateAction
+        name: End — compliance validation
+        status: Succeeded

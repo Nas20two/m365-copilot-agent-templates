@@ -1,0 +1,502 @@
+# Microsoft Copilot Studio Workflow — HR Onboarding Automation
+# Template: cliagent-workflow-1.0.0
+# Price: $79 · Complexity: Advanced · Connectors: Standard only
+# Pairs with: onboarding-buddy-agent.yaml + hr-policy-agent.yaml
+#
+# Import note: This YAML is an AgentSchema-aligned workflow specification.
+# Copilot Studio currently imports workflows via unmanaged solution .zip or
+# the visual designer. Use this file as the build blueprint, then export the
+# resulting workflow as a solution for distribution.
+
+kind: BotDefinition
+components:
+  - kind: BotSettingsComponent
+    settings:
+      kind: DefaultFeedbackCollection
+
+entity:
+  kind: BotEntity
+  displayName: HR Onboarding Automation Workflow
+  teamsAppInformation:
+    kind: ApplicationDetails
+    teams:
+      kind: TeamsApplicationDetails
+      lobDisplayName: HR Onboarding Automation
+      shortDescription: End-to-end new hire onboarding with tasks, check-ins, and agent handoffs.
+      longDescription: |
+        Automates new hire onboarding from the moment a new-hire record is
+        created. Sends welcome emails, creates Planner tasks for IT, Facilities,
+        and the onboarding buddy, hands off to the Onboarding Buddy and HR
+        Policy agents, and schedules 30/60/90-day check-ins.
+      accentColor: "#881798"
+  configuration:
+    kind: BotConfiguration
+    channels:
+      - kind: ChannelDefinition
+        id: Microsoft365Copilot
+        channelId: Microsoft365Copilot
+      - kind: ChannelDefinition
+        id: MsTeams
+        channelId: MsTeams
+    recognizer:
+      kind: CLICopilotRecognizer
+    agentSettings:
+      kind: AgentSettings
+      version: "1.0"
+      model:
+        series: gpt-4o
+      instructions:
+        segments:
+          - kind: StaticSegment
+            value: |-
+              # Purpose
+              You are the conversational entry point for HR Onboarding.
+              Employees can ask about onboarding status, request a welcome
+              summary, or learn about 30/60/90-day check-ins.
+
+              # General Guidelines
+              - Use only data from the New Hires list and Onboarding Dashboard.
+              - Do not invent start dates, managers, or buddy assignments.
+              - Direct benefits and policy questions to the connected
+                HR Policy Agent knowledge source.
+
+              # Response Format
+              - **New hire:** name / role / start date
+              - **Status:** Not started / In progress / Ready / Complete
+              - **Next milestone:** upcoming task or check-in
+              - **Buddy:** assigned buddy name or "not assigned"
+      enableMemory: true
+      web:
+        kind: WebSettings
+        enableWebSearch: false
+  publishedOn: 2026-09-02T00:00:00Z
+  synchronizationStatus:
+    kind: BotSynchronizationDetails
+    contentVersion: 2
+  template: cliagent-workflow-1.0.0
+
+environmentVariables:
+  - kind: EnvironmentVariableDefinition
+    displayName: New Hires List Name
+    schemaName: hr_NewHiresListName
+    type: String
+    defaultValue: New Hires
+    description: SharePoint list that receives new-hire records.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: HR Site URL
+    schemaName: hr_SiteUrl
+    type: String
+    defaultValue: https://<COMPANY>.sharepoint.com/sites/HR
+    description: SharePoint site containing the new-hires list and dashboard.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Welcome Sender Email
+    schemaName: hr_WelcomeSenderEmail
+    type: String
+    defaultValue: hr@<COMPANY>.onmicrosoft.com
+    description: Email address used for welcome and check-in messages.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: IT Contact Email
+    schemaName: hr_ITContactEmail
+    type: String
+    defaultValue: it-provisioning@<COMPANY>.onmicrosoft.com
+    description: IT contact referenced in equipment-provisioning tasks.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Onboarding Dashboard List Name
+    schemaName: hr_DashboardListName
+    type: String
+    defaultValue: Onboarding Dashboard
+    description: SharePoint list that tracks overall onboarding status.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Planner Plan ID
+    schemaName: hr_PlannerPlanId
+    type: String
+    defaultValue: <PLANNER_PLAN_ID>
+    description: Planner plan ID where onboarding tasks are created.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Planner Bucket ID
+    schemaName: hr_BucketId
+    type: String
+    defaultValue: <PLANNER_BUCKET_ID>
+    description: Planner bucket ID for new onboarding tasks.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Buddy Team ID
+    schemaName: hr_BuddyTeamId
+    type: String
+    defaultValue: <TEAMS_TEAM_ID>
+    description: Microsoft Teams team ID for buddy handoff posts.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Buddy Channel ID
+    schemaName: hr_BuddyChannelId
+    type: String
+    defaultValue: <TEAMS_CHANNEL_ID>
+    description: Teams channel where the onboarding buddy receives the handoff card.
+
+connectionReferences:
+  - kind: ConnectionReference
+    displayName: SharePoint Online
+    schemaName: hr_SharePointConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_sharepointonline
+    description: Connection for new-hire lists, dashboard, and document libraries.
+
+  - kind: ConnectionReference
+    displayName: Exchange Online
+    schemaName: hr_ExchangeOnlineConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_office365
+    description: Connection for welcome, check-in, and notification emails.
+
+  - kind: ConnectionReference
+    displayName: Microsoft Planner
+    schemaName: hr_PlannerConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_planner
+    description: Connection for creating onboarding tasks.
+
+  - kind: ConnectionReference
+    displayName: Microsoft Teams
+    schemaName: hr_TeamsConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_teams
+    description: Connection for buddy handoff and status cards.
+
+flows:
+  - kind: WorkflowDefinition
+    id: hr-onboarding-main
+    displayName: HR Onboarding — Main Flow
+    description: |
+      Triggered when a new-hire record is created in SharePoint. Sends a
+      welcome email, creates Planner tasks, hands off to the buddy and HR
+      policy agents, and initializes the onboarding dashboard entry.
+    status: Active
+    trigger:
+      kind: ConnectorTrigger
+      type: Event
+      displayName: When a new hire record is created
+      connector: sharepointonline
+      operation: OnNewItem
+      connectionReference: hr_SharePointConnection
+      inputs:
+        siteAddress: "@{environmentVariables('hr_SiteUrl')}"
+        listName: "@{environmentVariables('hr_NewHiresListName')}"
+      outputs:
+        itemId: string
+        Title: string
+        Email: string
+        Role: string
+        StartDate: dateTime
+        Manager: string
+        Buddy: string
+        Department: string
+        Location: string
+
+    variables:
+      - name: newHire
+        type: Object
+        default: {}
+
+    actions:
+      - kind: SetVariableAction
+        name: Store new hire record
+        inputs:
+          variable: newHire
+          value:
+            itemId: "@{triggerOutputs()?['itemId']}"
+            name: "@{triggerOutputs()?['Title']}"
+            email: "@{triggerOutputs()?['Email']}"
+            role: "@{triggerOutputs()?['Role']}"
+            startDate: "@{triggerOutputs()?['StartDate']}"
+            manager: "@{triggerOutputs()?['Manager']}"
+            buddy: "@{triggerOutputs()?['Buddy']}"
+            department: "@{triggerOutputs()?['Department']}"
+            location: "@{triggerOutputs()?['Location']}"
+
+      - kind: ConnectorAction
+        name: Send welcome email
+        connector: office365
+        operation: SendEmailV2
+        connectionReference: hr_ExchangeOnlineConnection
+        inputs:
+          to: "@{variables('newHire')['email']}"
+          subject: "Welcome to the team, @{variables('newHire')['name']}!"
+          body: |
+            Hi @{variables('newHire')['name']},
+
+            Welcome to @{variables('newHire')['department']}! We are excited to
+            have you start on @{variables('newHire')['startDate']} as
+            @{variables('newHire')['role']}.
+
+            Your manager is @{variables('newHire')['manager']} and your
+            onboarding buddy is @{variables('newHire')['buddy']}.
+
+            Next steps:
+            - IT will provision your equipment.
+            - Facilities will prepare your badge and desk in @{variables('newHire')['location']}.
+            - Your buddy will reach out before your start date.
+
+            If you have benefits or policy questions, ask the HR Policy Agent.
+
+            — HR
+        onFailure: Continue
+
+      - kind: ConnectorAction
+        name: Create IT equipment task
+        connector: planner
+        operation: CreateTask
+        connectionReference: hr_PlannerConnection
+        inputs:
+          planId: "@{environmentVariables('hr_PlannerPlanId')}"
+          bucketId: "@{environmentVariables('hr_BucketId')}"
+          title: "IT: Provision equipment for @{variables('newHire')['name']}"
+          assignments: []
+        outputs:
+          id: string
+
+      - kind: ConnectorAction
+        name: Create Facilities task
+        connector: planner
+        operation: CreateTask
+        connectionReference: hr_PlannerConnection
+        inputs:
+          planId: "@{environmentVariables('hr_PlannerPlanId')}"
+          bucketId: "@{environmentVariables('hr_BucketId')}"
+          title: "Facilities: Badge + desk for @{variables('newHire')['name']} (@{variables('newHire')['location']})"
+          assignments: []
+
+      - kind: ConnectorAction
+        name: Create buddy task
+        connector: planner
+        operation: CreateTask
+        connectionReference: hr_PlannerConnection
+        inputs:
+          planId: "@{environmentVariables('hr_PlannerPlanId')}"
+          bucketId: "@{environmentVariables('hr_BucketId')}"
+          title: "Buddy: Welcome plan for @{variables('newHire')['name']}"
+          assignments: []
+
+      - kind: ConnectorAction
+        name: Post buddy handoff card
+        connector: teams
+        operation: PostMessageToChannelV3
+        connectionReference: hr_TeamsConnection
+        inputs:
+          teamId: "@{environmentVariables('hr_BuddyTeamId')}"
+          channelId: "@{environmentVariables('hr_BuddyChannelId')}"
+          messageBody:
+            type: AdaptiveCard
+            version: "1.5"
+            body:
+              - type: TextBlock
+                text: "👋 New hire onboarding handoff"
+                weight: Bolder
+                size: Medium
+              - type: FactSet
+                facts:
+                  - title: Name
+                    value: "@{variables('newHire')['name']}"
+                  - title: Role
+                    value: "@{variables('newHire')['role']}"
+                  - title: Start date
+                    value: "@{variables('newHire')['startDate']}"
+                  - title: Location
+                    value: "@{variables('newHire')['location']}"
+                  - title: Buddy
+                    value: "@{variables('newHire')['buddy']}"
+              - type: TextBlock
+                text: "Please reach out to @{variables('newHire')['name']} before the start date. The Onboarding Buddy Agent can help answer common questions."
+        onFailure: Continue
+
+      - kind: ConnectorAction
+        name: Create dashboard entry
+        connector: sharepointonline
+        operation: CreateItem
+        connectionReference: hr_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('hr_SiteUrl')}"
+          listName: "@{environmentVariables('hr_DashboardListName')}"
+          item:
+            Title: "@{variables('newHire')['name']}"
+            Role: "@{variables('newHire')['role']}"
+            Department: "@{variables('newHire')['department']}"
+            Manager: "@{variables('newHire')['manager']}"
+            Buddy: "@{variables('newHire')['buddy']}"
+            StartDate: "@{variables('newHire')['startDate']}"
+            Email: "@{variables('newHire')['email']}"
+            Status: In Progress
+            Milestone: Welcome sent
+            ITTaskCreated: true
+            FacilitiesTaskCreated: true
+            BuddyTaskCreated: true
+        outputs:
+          id: string
+
+      - kind: TerminateAction
+        name: End — onboarding main
+        status: Succeeded
+
+  - kind: WorkflowDefinition
+    id: hr-onboarding-prestart
+    displayName: HR Onboarding — Pre-start Readiness
+    description: Runs daily to remind new hires starting tomorrow and update dashboard status.
+    status: Active
+    trigger:
+      kind: BuiltInTrigger
+      type: Recurrence
+      displayName: Daily pre-start check
+      inputs:
+        frequency: Day
+        interval: 1
+        startTime: "2026-09-02T09:00:00Z"
+        timeZone: UTC
+
+    actions:
+      - kind: ConnectorAction
+        name: Get hires starting tomorrow
+        connector: sharepointonline
+        operation: GetItems
+        connectionReference: hr_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('hr_SiteUrl')}"
+          listName: "@{environmentVariables('hr_NewHiresListName')}"
+          filterQuery: "StartDate ge datetime'@{formatDateTime(addDays(utcNow(), 1), 'yyyy-MM-ddT00:00:00Z')}' and StartDate lt datetime'@{formatDateTime(addDays(utcNow(), 2), 'yyyy-MM-ddT00:00:00Z')}'"
+          top: 100
+
+      - kind: LoopAction
+        name: Remind each hire
+        type: ApplyToEach
+        items: "@{outputs('Get hires starting tomorrow')?['body/value']}"
+        actions:
+          - kind: ConnectorAction
+            name: Send pre-start reminder email
+            connector: office365
+            operation: SendEmailV2
+            connectionReference: hr_ExchangeOnlineConnection
+            inputs:
+              to: "@{item()?['Email']}"
+              subject: "Your first day is tomorrow, @{item()?['Title']}"
+              body: |
+                Hi @{item()?['Title']},
+
+                Your first day is tomorrow! Please arrive at
+                @{item()?['Location']} and check in with your manager
+                @{item()?['Manager']}.
+
+                Your buddy @{item()?['Buddy']} will meet you at your desk.
+
+                — HR
+
+          - kind: ConnectorAction
+            name: Update dashboard to Ready
+            connector: sharepointonline
+            operation: UpdateItem
+            connectionReference: hr_SharePointConnection
+            inputs:
+              siteAddress: "@{environmentVariables('hr_SiteUrl')}"
+              listName: "@{environmentVariables('hr_DashboardListName')}"
+              id: "@{item()?['ID']}"
+              item:
+                Status: Ready
+                Milestone: Pre-start reminder sent
+            onFailure: Continue
+
+      - kind: TerminateAction
+        name: End — pre-start
+        status: Succeeded
+
+  - kind: WorkflowDefinition
+    id: hr-onboarding-checkins
+    displayName: HR Onboarding — 30/60/90 Check-ins
+    description: Runs daily to send 30, 60, and 90-day check-in prompts and update the dashboard.
+    status: Active
+    trigger:
+      kind: BuiltInTrigger
+      type: Recurrence
+      displayName: Daily check-in schedule
+      inputs:
+        frequency: Day
+        interval: 1
+        startTime: "2026-09-02T10:00:00Z"
+        timeZone: UTC
+
+    actions:
+      - kind: ConnectorAction
+        name: Get active hires
+        connector: sharepointonline
+        operation: GetItems
+        connectionReference: hr_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('hr_SiteUrl')}"
+          listName: "@{environmentVariables('hr_NewHiresListName')}"
+          filterQuery: "StartDate le datetime'@{utcNow()}' and Status ne 'Complete'"
+          top: 200
+
+      - kind: LoopAction
+        name: Check each hire milestone
+        type: ApplyToEach
+        items: "@{outputs('Get active hires')?['body/value']}"
+        actions:
+          - kind: PromptAction
+            name: Determine check-in milestone
+            model: gpt-4o
+            prompt: |-
+              Given a start date, determine whether today is exactly a 30, 60,
+              or 90 day work anniversary. Return ONLY one of: 30-day, 60-day,
+              90-day, none.
+
+              Start date: @{item()?['StartDate']}
+              Today: @{utcNow()}
+            output:
+              name: milestone
+              type: String
+              expectedValues: [30-day, 60-day, 90-day, none]
+            onFailure: Continue
+            fallbackValue: none
+
+          - kind: ConditionAction
+            name: Is a milestone today?
+            condition:
+              operator: notEquals
+              left: "@{outputs('Determine check-in milestone')?['milestone']}"
+              right: none
+            trueBranch:
+              - kind: ConnectorAction
+                name: Send check-in email
+                connector: office365
+                operation: SendEmailV2
+                connectionReference: hr_ExchangeOnlineConnection
+                inputs:
+                  to: "@{item()?['Email']}"
+                  cc: "@{item()?['Manager']}"
+                  subject: "@{outputs('Determine check-in milestone')?['milestone']} check-in — @{item()?['Title']}"
+                  body: |
+                    Hi @{item()?['Title']},
+
+                    Congratulations on reaching your @{outputs('Determine check-in milestone')?['milestone']} milestone!
+
+                    Please reply to this email or chat with your manager to share
+                    how things are going, any blockers, and feedback.
+
+                    — HR
+
+              - kind: ConnectorAction
+                name: Update dashboard milestone
+                connector: sharepointonline
+                operation: UpdateItem
+                connectionReference: hr_SharePointConnection
+                inputs:
+                  siteAddress: "@{environmentVariables('hr_SiteUrl')}"
+                  listName: "@{environmentVariables('hr_DashboardListName')}"
+                  id: "@{item()?['ID']}"
+                  item:
+                    Milestone: "@{outputs('Determine check-in milestone')?['milestone']} check-in sent"
+                    Status: "@{if(equals(outputs('Determine check-in milestone')?['milestone'], '90-day'), 'Complete', 'In Progress')}"
+                onFailure: Continue
+            falseBranch: []
+
+      - kind: TerminateAction
+        name: End — check-ins
+        status: Succeeded

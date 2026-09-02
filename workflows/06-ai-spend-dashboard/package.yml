@@ -41,9 +41,15 @@ env_vars:
   - name: spend_OutlierThresholdPerUser
     description: "Spend per user above which a team is flagged, in USD"
     example: "500"
+  - name: spend_DashboardSiteUrl
+    description: "SharePoint site containing the AI Spend Dashboard list"
+    example: "https://contoso.sharepoint.com/sites/Finance"
   - name: spend_DashboardListName
     description: "SharePoint list name for the spend dashboard (Power BI source)"
     example: "AI Spend Dashboard"
+  - name: spend_ExecTeamId
+    description: "Microsoft Teams team ID for executive summary cards"
+    example: "<TEAMS_TEAM_ID>"
   - name: spend_ExecChannelId
     description: "Teams channel ID for executive summary cards"
     example: "<TEAMS_CHANNEL_ID>"

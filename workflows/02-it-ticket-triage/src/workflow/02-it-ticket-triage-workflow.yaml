@@ -1,0 +1,624 @@
+# Microsoft Copilot Studio Workflow — IT Ticket Triage & Escalation
+# Template: cliagent-workflow-1.0.0
+# Price: $49 · Complexity: Mid · Connectors: Standard only
+# Pairs with: it-helpdesk-agent.yaml
+#
+# Import note: This YAML is an AgentSchema-aligned workflow specification.
+# Copilot Studio currently imports workflows via unmanaged solution .zip or
+# the visual designer. Use this file as the build blueprint, then export the
+# resulting workflow as a solution for distribution.
+
+kind: BotDefinition
+components:
+  - kind: BotSettingsComponent
+    settings:
+      kind: DefaultFeedbackCollection
+
+entity:
+  kind: BotEntity
+  displayName: IT Ticket Triage & Escalation Workflow
+  teamsAppInformation:
+    kind: ApplicationDetails
+    teams:
+      kind: TeamsApplicationDetails
+      lobDisplayName: IT Ticket Triage & Escalation
+      shortDescription: AI helpdesk ticket triage, SLA tracking, and escalation.
+      longDescription: |
+        Automates IT helpdesk ticketing from email, Teams, and agent
+        conversations. Classifies requests, creates SharePoint list tickets,
+        manages SLA timers, and escalates aging items back to the team.
+      accentColor: "#107c10"
+  configuration:
+    kind: BotConfiguration
+    channels:
+      - kind: ChannelDefinition
+        id: Microsoft365Copilot
+        channelId: Microsoft365Copilot
+      - kind: ChannelDefinition
+        id: MsTeams
+        channelId: MsTeams
+    recognizer:
+      kind: CLICopilotRecognizer
+    agentSettings:
+      kind: AgentSettings
+      version: "1.0"
+      model:
+        series: gpt-4o
+      instructions:
+        segments:
+          - kind: StaticSegment
+            value: |-
+              # Purpose
+              You are the conversational entry point for the IT Ticket Triage
+              workflow. Employees can ask about an open ticket, report a new
+              issue, or request a weekly summary.
+
+              # General Guidelines
+              - Use only ticket data from the connected SharePoint list and
+                workflow run history.
+              - Do not invent ticket IDs, statuses, or assignee names.
+              - When creating a ticket from chat, summarize the issue and tell
+                the user the ticket will be created in SharePoint.
+
+              # Response Format
+              - **Ticket ID:** SharePoint item ID or "being created"
+              - **Category:** Password Reset / Software / Hardware / Access / Other
+              - **Priority:** P1 Critical / P2 High / P3 Medium / P4 Low
+              - **Next step:** SLA target or escalation status
+      enableMemory: true
+      web:
+        kind: WebSettings
+        enableWebSearch: false
+  publishedOn: 2026-09-02T00:00:00Z
+  synchronizationStatus:
+    kind: BotSynchronizationDetails
+    contentVersion: 2
+  template: cliagent-workflow-1.0.0
+
+environmentVariables:
+  - kind: EnvironmentVariableDefinition
+    displayName: Helpdesk Mailbox Address
+    schemaName: helpdesk_MailboxAddress
+    type: String
+    defaultValue: helpdesk@<COMPANY>.onmicrosoft.com
+    description: Exchange Online mailbox monitored for incoming ticket requests.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Tickets List Name
+    schemaName: helpdesk_TicketsListName
+    type: String
+    defaultValue: IT Tickets
+    description: SharePoint list where tickets are created and tracked.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Helpdesk Site URL
+    schemaName: helpdesk_SiteUrl
+    type: String
+    defaultValue: https://<COMPANY>.sharepoint.com/sites/IT
+    description: SharePoint site containing the IT tickets list.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Teams Team ID
+    schemaName: helpdesk_TeamsTeamId
+    type: String
+    defaultValue: <TEAMS_TEAM_ID>
+    description: Microsoft Teams team ID containing the helpdesk channel.
+
+  - kind: EnvironmentVariableDefinition
+    displayName: Teams Channel ID
+    schemaName: helpdesk_TeamsChannelId
+    type: String
+    defaultValue: <TEAMS_CHANNEL_ID>
+    description: Teams channel where ticket notifications and escalations are posted.
+
+connectionReferences:
+  - kind: ConnectionReference
+    displayName: Exchange Online
+    schemaName: helpdesk_ExchangeOnlineConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_office365
+    description: Connection for helpdesk mailbox ingestion and email notifications.
+
+  - kind: ConnectionReference
+    displayName: SharePoint Online
+    schemaName: helpdesk_SharePointConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_sharepointonline
+    description: Connection for ticket list CRUD and audit logging.
+
+  - kind: ConnectionReference
+    displayName: Microsoft Teams
+    schemaName: helpdesk_TeamsConnection
+    connectorId: /providers/Microsoft.PowerApps/apis/shared_teams
+    description: Connection for helpdesk channel notifications.
+
+flows:
+  - kind: WorkflowDefinition
+    id: it-ticket-triage
+    displayName: IT Ticket Triage — Main
+    description: |
+      Triggered by helpdesk email, Teams message, or the IT Helpdesk Agent.
+      Classifies the request, assigns priority, creates a SharePoint ticket,
+      and posts a status update.
+    status: Active
+
+    triggers:
+      - kind: ConnectorTrigger
+        id: trigger-email
+        displayName: When email arrives at helpdesk mailbox
+        type: Event
+        connector: office365
+        operation: OnNewEmailV3
+        connectionReference: helpdesk_ExchangeOnlineConnection
+        inputs:
+          folderPath: Inbox
+          to: helpdesk@<COMPANY>.onmicrosoft.com
+          importance: Any
+          includeAttachments: false
+          subjectFilter: null
+        outputs:
+          messageId: string
+          subject: string
+          body: string
+          from: string
+          receivedDateTime: dateTime
+
+      - kind: ConnectorTrigger
+        id: trigger-teams
+        displayName: When a new message is posted in the helpdesk channel
+        type: Event
+        connector: teams
+        operation: OnNewChannelMessage
+        connectionReference: helpdesk_TeamsConnection
+        inputs:
+          teamId: "@{environmentVariables('helpdesk_TeamsTeamId')}"
+          channelId: "@{environmentVariables('helpdesk_TeamsChannelId')}"
+        outputs:
+          messageId: string
+          from: string
+          body: string
+          createdDateTime: dateTime
+
+      - kind: AgentTrigger
+        id: trigger-agent
+        displayName: When the IT Helpdesk Agent submits a request
+        type: AgentConversation
+        inputs:
+          requestText: string
+          requesterEmail: string
+          requesterName: string
+        outputs:
+          requestText: string
+          requesterEmail: string
+          requesterName: string
+
+    variables:
+      - name: ticketRequest
+        type: String
+        default: ""
+      - name: requester
+        type: String
+        default: ""
+      - name: category
+        type: String
+        default: Other
+      - name: severity
+        type: String
+        default: P3 Medium
+      - name: dueDate
+        type: String
+        default: ""
+      - name: ticketId
+        type: String
+        default: ""
+
+    actions:
+      - kind: ConditionAction
+        name: Route request source
+        condition:
+          operator: notEquals
+          left: "@{coalesce(triggerOutputs()?['messageId'], '')}"
+          right: ""
+        trueBranch:
+          - kind: SetVariableAction
+            name: Set request from email
+            inputs:
+              variable: ticketRequest
+              value: "@{triggerOutputs()?['subject']}\n\n@{triggerOutputs()?['body']}"
+          - kind: SetVariableAction
+            name: Set requester from email
+            inputs:
+              variable: requester
+              value: "@{triggerOutputs()?['from']}"
+        falseBranch:
+          - kind: ConditionAction
+            name: Was it Teams?
+            condition:
+              operator: notEquals
+              left: "@{coalesce(triggerOutputs()?['body'], '')}"
+              right: ""
+            trueBranch:
+              - kind: SetVariableAction
+                name: Set request from Teams
+                inputs:
+                  variable: ticketRequest
+                  value: "@{triggerOutputs()?['body']}"
+              - kind: SetVariableAction
+                name: Set requester from Teams
+                inputs:
+                  variable: requester
+                  value: "@{triggerOutputs()?['from']}"
+            falseBranch:
+              - kind: SetVariableAction
+                name: Set request from agent
+                inputs:
+                  variable: ticketRequest
+                  value: "@{triggerOutputs()?['requestText']}"
+              - kind: SetVariableAction
+                name: Set requester from agent
+                inputs:
+                  variable: requester
+                  value: "@{triggerOutputs()?['requesterEmail']}"
+
+      - kind: AIClassifyAction
+        name: Classify request category
+        model: gpt-4o
+        prompt: |-
+          You are an IT helpdesk triage assistant. Classify the user request
+          below into exactly one category: Password Reset, Software, Hardware,
+          Access, or Other.
+
+          Rules:
+          - Password Reset: user cannot log in, forgot password, locked account, MFA issue.
+          - Software: application install, license, bug, update, plugin.
+          - Hardware: laptop, monitor, phone, peripheral, broken device.
+          - Access: request permissions, shared drive, group membership, VPN.
+          - Other: anything that does not fit above.
+
+          Respond with ONLY the category label.
+
+          Request:
+          @{variables('ticketRequest')}
+        output:
+          name: category
+          type: String
+          expectedValues: [Password Reset, Software, Hardware, Access, Other]
+        onFailure: Continue
+        fallbackValue: Other
+
+      - kind: SetVariableAction
+        name: Store category
+        inputs:
+          variable: category
+          value: "@{outputs('Classify request category')?['category']}"
+
+      - kind: AIClassifyAction
+        name: Classify request severity
+        model: gpt-4o
+        prompt: |-
+          You are an IT helpdesk severity classifier. Assign exactly one
+          priority to the request below: P1 Critical, P2 High, P3 Medium, or
+          P4 Low.
+
+          Rules:
+          - P1 Critical: service outage, security incident, C-suite escalation,
+            or user completely unable to work.
+          - P2 High: multi-user impact, deadline within 4 hours, or important
+            system degraded.
+          - P3 Medium: single-user non-blocking issue, general support request.
+          - P4 Low: informational, cosmetic, non-urgent improvement.
+
+          Request:
+          @{variables('ticketRequest')}
+          Category: @{variables('category')}
+
+          Respond with ONLY the priority label.
+        output:
+          name: severity
+          type: String
+          expectedValues: [P1 Critical, P2 High, P3 Medium, P4 Low]
+        onFailure: Continue
+        fallbackValue: P3 Medium
+
+      - kind: SetVariableAction
+        name: Store severity
+        inputs:
+          variable: severity
+          value: "@{outputs('Classify request severity')?['severity']}"
+
+      - kind: ConditionAction
+        name: Set SLA by severity
+        condition:
+          operator: equals
+          left: "@{variables('severity')}"
+          right: "P1 Critical"
+        trueBranch:
+          - kind: SetVariableAction
+            name: Set P1 due date
+            inputs:
+              variable: dueDate
+              value: "@{addMinutes(utcNow(), 15)}"
+        falseBranch:
+          - kind: ConditionAction
+            name: Is P2 High?
+            condition:
+              operator: equals
+              left: "@{variables('severity')}"
+              right: "P2 High"
+            trueBranch:
+              - kind: SetVariableAction
+                name: Set P2 due date
+                inputs:
+                  variable: dueDate
+                  value: "@{addHours(utcNow(), 4)}"
+            falseBranch:
+              - kind: ConditionAction
+                name: Is P3 Medium?
+                condition:
+                  operator: equals
+                  left: "@{variables('severity')}"
+                  right: "P3 Medium"
+                trueBranch:
+                  - kind: SetVariableAction
+                    name: Set P3 due date
+                    inputs:
+                      variable: dueDate
+                      value: "@{addHours(utcNow(), 8)}"
+                falseBranch:
+                  - kind: SetVariableAction
+                    name: Set P4 due date
+                    inputs:
+                      variable: dueDate
+                      value: "@{addHours(startOfDay(utcNow()), 17)}"
+
+      - kind: ConnectorAction
+        name: Create ticket
+        connector: sharepointonline
+        operation: CreateItem
+        connectionReference: helpdesk_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('helpdesk_SiteUrl')}"
+          listName: "@{environmentVariables('helpdesk_TicketsListName')}"
+          item:
+            Title: "@{variables('category')} — @{substring(variables('ticketRequest'), 0, min(length(variables('ticketRequest')), 80))}"
+            Requester: "@{variables('requester')}"
+            Category: "@{variables('category')}"
+            Severity: "@{variables('severity')}"
+            Status: Open
+            DueDate: "@{variables('dueDate')}"
+            Source: "@{if(equals(coalesce(triggerOutputs()?['messageId'], ''), ''), if(equals(coalesce(triggerOutputs()?['body'], ''), ''), 'Agent', 'Teams'), 'Email')}"
+            Description: "@{variables('ticketRequest')}"
+        outputs:
+          id: string
+
+      - kind: SetVariableAction
+        name: Store ticket ID
+        inputs:
+          variable: ticketId
+          value: "@{outputs('Create ticket')?['id']}"
+
+      - kind: ConditionAction
+        name: Is critical or high?
+        condition:
+          operator: in
+          left: "@{variables('severity')}"
+          right: ["P1 Critical", "P2 High"]
+        trueBranch:
+          - kind: ConnectorAction
+            name: Post urgent ticket to Teams
+            connector: teams
+            operation: PostMessageToChannelV3
+            connectionReference: helpdesk_TeamsConnection
+            inputs:
+              teamId: "@{environmentVariables('helpdesk_TeamsTeamId')}"
+              channelId: "@{environmentVariables('helpdesk_TeamsChannelId')}"
+              messageBody:
+                type: AdaptiveCard
+                version: "1.5"
+                body:
+                  - type: TextBlock
+                    text: "🚨 @{variables('severity')} IT ticket created"
+                    weight: Bolder
+                    size: Medium
+                  - type: TextBlock
+                    text: "Ticket ID: @{variables('ticketId')}"
+                  - type: TextBlock
+                    text: "Category: @{variables('category')}"
+                  - type: TextBlock
+                    text: "Requester: @{variables('requester')}"
+                  - type: TextBlock
+                    text: "SLA due: @{variables('dueDate')}"
+            onFailure: Continue
+        falseBranch: []
+
+      - kind: ConnectorAction
+        name: Post status update to Teams
+        connector: teams
+        operation: PostMessageToChannelV3
+        connectionReference: helpdesk_TeamsConnection
+        inputs:
+          teamId: "@{environmentVariables('helpdesk_TeamsTeamId')}"
+          channelId: "@{environmentVariables('helpdesk_TeamsChannelId')}"
+          messageBody:
+            type: AdaptiveCard
+            version: "1.5"
+            body:
+              - type: TextBlock
+                text: "🎫 IT ticket @{variables('ticketId')} — @{variables('severity')}"
+                weight: Bolder
+                size: Medium
+              - type: TextBlock
+                text: "Category: @{variables('category')}"
+              - type: TextBlock
+                text: "Requester: @{variables('requester')}"
+              - type: TextBlock
+                text: "SLA due: @{variables('dueDate')}"
+        onFailure: Continue
+
+      - kind: TerminateAction
+        name: End — ticket triage
+        status: Succeeded
+
+  - kind: WorkflowDefinition
+    id: it-ticket-sla-escalation
+    displayName: IT Ticket Triage — SLA Escalation Loop
+    description: Runs every hour to find breached tickets, escalate them, and notify the channel.
+    status: Active
+    trigger:
+      kind: BuiltInTrigger
+      type: Recurrence
+      displayName: Hourly SLA check
+      inputs:
+        frequency: Hour
+        interval: 1
+        startTime: "2026-09-02T00:00:00Z"
+        timeZone: UTC
+
+    variables:
+      - name: breachedTickets
+        type: Array
+        default: []
+
+    actions:
+      - kind: ConnectorAction
+        name: Get open breached tickets
+        connector: sharepointonline
+        operation: GetItems
+        connectionReference: helpdesk_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('helpdesk_SiteUrl')}"
+          listName: "@{environmentVariables('helpdesk_TicketsListName')}"
+          filterQuery: "Status ne 'Closed' and DueDate lt datetime'@{utcNow()}'"
+          orderBy: Severity asc, DueDate asc
+          top: 100
+
+      - kind: SetVariableAction
+        name: Store breached tickets
+        inputs:
+          variable: breachedTickets
+          value: "@{outputs('Get open breached tickets')?['body/value']}"
+
+      - kind: LoopAction
+        name: Escalate each breached ticket
+        type: ApplyToEach
+        items: "@{variables('breachedTickets')}"
+        actions:
+          - kind: ConnectorAction
+            name: Update ticket to Escalated
+            connector: sharepointonline
+            operation: UpdateItem
+            connectionReference: helpdesk_SharePointConnection
+            inputs:
+              siteAddress: "@{environmentVariables('helpdesk_SiteUrl')}"
+              listName: "@{environmentVariables('helpdesk_TicketsListName')}"
+              id: "@{item()?['ID']}"
+              item:
+                Status: Escalated
+                EscalatedAt: "@{utcNow()}"
+
+          - kind: ConnectorAction
+            name: Post escalation to Teams
+            connector: teams
+            operation: PostMessageToChannelV3
+            connectionReference: helpdesk_TeamsConnection
+            inputs:
+              teamId: "@{environmentVariables('helpdesk_TeamsTeamId')}"
+              channelId: "@{environmentVariables('helpdesk_TeamsChannelId')}"
+              messageBody:
+                type: AdaptiveCard
+                version: "1.5"
+                body:
+                  - type: TextBlock
+                    text: "⏰ SLA breached — ticket @{item()?['ID']} escalated"
+                    weight: Bolder
+                    color: Attention
+                  - type: TextBlock
+                    text: "Category: @{item()?['Category']}"
+                  - type: TextBlock
+                    text: "Severity: @{item()?['Severity']}"
+                  - type: TextBlock
+                    text: "Requester: @{item()?['Requester']}"
+                  - type: TextBlock
+                    text: "Due: @{item()?['DueDate']}"
+            onFailure: Continue
+
+      - kind: TerminateAction
+        name: End — SLA check
+        status: Succeeded
+
+  - kind: WorkflowDefinition
+    id: it-ticket-weekly-summary
+    displayName: IT Ticket Triage — Weekly Summary
+    description: Sends a weekly summary of ticket volume and open items to the helpdesk channel.
+    status: Active
+    trigger:
+      kind: BuiltInTrigger
+      type: Recurrence
+      displayName: Weekly summary schedule
+      inputs:
+        frequency: Week
+        interval: 1
+        startTime: "2026-09-06T08:00:00Z"
+        timeZone: UTC
+
+    variables:
+      - name: weeklyStats
+        type: Object
+        default:
+          total: 0
+          open: 0
+          escalated: 0
+          p1: 0
+          p2: 0
+          p3: 0
+          p4: 0
+
+    actions:
+      - kind: ConnectorAction
+        name: Get this week's tickets
+        connector: sharepointonline
+        operation: GetItems
+        connectionReference: helpdesk_SharePointConnection
+        inputs:
+          siteAddress: "@{environmentVariables('helpdesk_SiteUrl')}"
+          listName: "@{environmentVariables('helpdesk_TicketsListName')}"
+          filterQuery: "Created ge datetime'@{formatDateTime(addDays(utcNow(), -7), 'yyyy-MM-ddTHH:mm:ssZ')}'"
+          orderBy: Created desc
+          top: 500
+
+      - kind: SetVariableAction
+        name: Build weekly stats
+        inputs:
+          variable: weeklyStats
+          value:
+            total: "@{length(outputs('Get this week''s tickets')?['body/value'])}"
+            open: "@{length(filter(outputs('Get this week''s tickets')?['body/value'], lambda(item, not(equals(item?['Status'], 'Closed')))))}"
+            escalated: "@{length(filter(outputs('Get this week''s tickets')?['body/value'], lambda(item, equals(item?['Status'], 'Escalated'))))}"
+            p1: "@{length(filter(outputs('Get this week''s tickets')?['body/value'], lambda(item, equals(item?['Severity'], 'P1 Critical'))))}"
+            p2: "@{length(filter(outputs('Get this week''s tickets')?['body/value'], lambda(item, equals(item?['Severity'], 'P2 High'))))}"
+            p3: "@{length(filter(outputs('Get this week''s tickets')?['body/value'], lambda(item, equals(item?['Severity'], 'P3 Medium'))))}"
+            p4: "@{length(filter(outputs('Get this week''s tickets')?['body/value'], lambda(item, equals(item?['Severity'], 'P4 Low'))))}"
+
+      - kind: ConnectorAction
+        name: Post weekly summary to Teams
+        connector: teams
+        operation: PostMessageToChannelV3
+        connectionReference: helpdesk_TeamsConnection
+        inputs:
+          teamId: "@{environmentVariables('helpdesk_TeamsTeamId')}"
+          channelId: "@{environmentVariables('helpdesk_TeamsChannelId')}"
+          messageBody:
+            type: AdaptiveCard
+            version: "1.5"
+            body:
+              - type: TextBlock
+                text: "📊 Weekly IT Ticket Summary"
+                weight: Bolder
+                size: Medium
+              - type: TextBlock
+                text: "Total this week: @{variables('weeklyStats')['total']} | Open: @{variables('weeklyStats')['open']} | Escalated: @{variables('weeklyStats')['escalated']}"
+              - type: TextBlock
+                text: "P1: @{variables('weeklyStats')['p1']} | P2: @{variables('weeklyStats')['p2']} | P3: @{variables('weeklyStats')['p3']} | P4: @{variables('weeklyStats')['p4']}"
+        onFailure: Continue
+
+      - kind: TerminateAction
+        name: End — weekly summary
+        status: Succeeded
