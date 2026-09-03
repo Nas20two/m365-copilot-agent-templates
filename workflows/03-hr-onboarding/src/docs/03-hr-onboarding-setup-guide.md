@@ -1,6 +1,5 @@
 # HR Onboarding Automation — Setup Guide
 
-> **Price:** $79 · **Build time:** ~8–12 hours · **Difficulty:** Advanced
 
 End-to-end new hire onboarding. Fires welcome emails, assigns Planner tasks, hands off to onboarding + HR policy agents, automates 30/60/90-day check-ins.
 

@@ -1,6 +1,5 @@
 # Microsoft Copilot Studio Workflow — AI Spend & Productivity Dashboard
 # Template: cliagent-workflow-1.0.0
-# Price: $99 · Complexity: Advanced · Connectors: Standard (+ optional premium)
 # Pairs with: agent-cost-intelligence (nasyhub.com)
 #
 # Import note: This YAML is an AgentSchema-aligned workflow specification.

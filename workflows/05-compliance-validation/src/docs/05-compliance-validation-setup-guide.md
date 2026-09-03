@@ -1,6 +1,5 @@
 # Compliance Document Validation — Setup Guide
 
-> **Price:** $79–$99 · **Build time:** ~10–14 hours · **Difficulty:** Advanced
 
 Validates documents against regulatory and policy guidelines. Categorizes violations by risk level, routes to human legal review, and maintains a complete audit trail.
 

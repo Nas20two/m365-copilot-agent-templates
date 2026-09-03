@@ -1,6 +1,5 @@
 # AI Spend & Productivity Dashboard — Setup Guide
 
-> **Price:** $99 · **Build time:** ~10–14 hours · **Difficulty:** Advanced
 
 Monthly AI spend intelligence for execs. Pulls card transactions and M365 Copilot usage data, classifies every dollar as productive / experimental / shadow IT, flags outlier teams, and delivers a CFO-ready report.
 

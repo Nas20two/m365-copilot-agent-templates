@@ -1,6 +1,5 @@
 # AI Spend & Productivity Dashboard — Workflow Template
 
-> **Price:** $99 · **Build time:** ~10–14 hours · **Difficulty:** Advanced
 
 Monthly AI spend intelligence for execs. Pulls card transactions and M365 Copilot usage data, classifies every dollar as productive / experimental / shadow IT, flags outlier teams, and delivers a CFO-ready report.
 
@@ -72,4 +71,4 @@ Concur, Expensify, and other expense-system connectors are premium (require Powe
 
 ---
 
-*Pairs with: `agent-cost-intelligence` (nasyhub.com)*
+*Pairs with: **Vela** (https://nasyhub.com/vela) — NaSy Hub's AI cost intelligence web app. Vela audits AI spend across any LLM/provider in 60 seconds. This workflow gives the deep M365 drill-down (per-user, per-team, per-app). Together: broad picture + deep detail. Each works standalone.*

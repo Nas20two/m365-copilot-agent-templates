@@ -1,6 +1,5 @@
 # Microsoft Copilot Studio Workflow — Compliance Document Validation
 # Template: cliagent-workflow-1.0.0
-# Price: $79–$99 · Complexity: Advanced · Connectors: Standard
 # Pairs with: legal-compliance-agent.yaml
 #
 # Import note: This YAML is an AgentSchema-aligned workflow specification.

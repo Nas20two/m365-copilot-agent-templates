@@ -1,6 +1,5 @@
 # Email Triage & Daily Digest — Workflow Template
 
-> **Price:** $29–$49 · **Build time:** ~4–6 hours · **Difficulty:** Standard
 
 Quickest path to a shippable Copilot Studio workflow. No premium connectors. Widest buyer pool.
 

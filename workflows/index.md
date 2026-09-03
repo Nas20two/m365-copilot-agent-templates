@@ -8,14 +8,14 @@
 
 ## Workflow Catalog
 
-| ID | Workflow | Price | Pairs With | Complexity | Build Order |
-|----|----------|-------|------------|------------|-------------|
-| 01 | **Document Approval — AI Pre-check + Human Sign-off** | $79 | `legal-compliance-agent.yaml` | Advanced | 🥈 Second |
-| 02 | **IT Ticket Triage & Escalation** | $49 | `it-helpdesk-agent.yaml` | Mid | Third |
-| 03 | **HR Onboarding Automation** | $79 | `onboarding-buddy-agent.yaml` + `hr-policy-agent.yaml` | Advanced | Fourth |
-| 04 | **Email Triage & Daily Digest** | $29–$49 | All agents (standalone) | Standard | 🥇 First |
-| 05 | **Compliance Document Validation** | $79–$99 | `legal-compliance-agent.yaml` | Advanced | Fifth |
-| 06 | **AI Spend & Productivity Dashboard** | $99 | `agent-cost-intelligence` (nasyhub) | Advanced | Sixth |
+| ID | Workflow | Pairs With | Complexity | Build Order |
+|----|----------|------------|------------|-------------|
+| 01 | **Document Approval — AI Pre-check + Human Sign-off** | `legal-compliance-agent.yaml` | Advanced | 🥈 Second |
+| 02 | **IT Ticket Triage & Escalation** | `it-helpdesk-agent.yaml` | Mid | Third |
+| 03 | **HR Onboarding Automation** | `onboarding-buddy-agent.yaml` + `hr-policy-agent.yaml` | Advanced | Fourth |
+| 04 | **Email Triage & Daily Digest** | All agents (standalone) | Standard | 🥇 First |
+| 05 | **Compliance Document Validation** | `legal-compliance-agent.yaml` | Advanced | Fifth |
+| 06 | **AI Spend & Productivity Dashboard** | `agent-cost-intelligence` (nasyhub) | Advanced | Sixth |
 
 ---
 
@@ -32,14 +32,12 @@ Every workflow ships with 4 deliverables:
 
 ## Bundles
 
-| Bundle | Contents | Price |
-|--------|----------|-------|
-| **Starter Pack** | #4 + #5 | $99 |
-| **Core Three** | #4 + #1 + #2 | $179 |
-| **Enterprise Workflow Library** | All 5 + future verticals + quarterly updates | $249 |
-| **AI Spend & Productivity Dashboard** | #6 only — premium/custom connectors | $99 |
-
-> ℹ️ Bundle pricing follows VEX's recommendation (see design doc §11). Quarterly updates aligned to Microsoft release waves.
+| Bundle | Contents |
+|--------|----------|
+| **Starter Pack** | #4 + #5 |
+| **Core Three** | #4 + #1 + #2 |
+| **Enterprise Workflow Library** | All 5 + future verticals + quarterly updates |
+| **AI Spend & Productivity Dashboard** | #6 only — premium/custom connectors |
 
 ---
 

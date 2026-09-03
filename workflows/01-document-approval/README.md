@@ -1,6 +1,5 @@
 # Document Approval — AI Pre-check + Human Sign-off
 
-> **Price:** $79 · **Build time:** ~8–12 hours · **Difficulty:** Advanced
 
 Flagship enterprise workflow. Automates document review — invoices, POs, contracts, expense reports — by extracting key fields, validating against policy thresholds, and routing to the right approval path (AI or human) with full audit trail.
 

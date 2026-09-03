@@ -1,6 +1,5 @@
 # IT Ticket Triage & Escalation — Setup Guide
 
-> **Price:** $49 · **Build time:** ~6–8 hours · **Difficulty:** Mid
 
 Automates IT helpdesk ticketing from email, Teams, and agent conversations. LLM classifies requests, creates SharePoint list tickets, manages SLA timers, and escalates aging items.
 

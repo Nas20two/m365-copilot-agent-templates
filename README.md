@@ -31,25 +31,25 @@ Each workflow ships with: YAML spec, setup guide, test data, and a walkthrough v
 
 ### Why buy vs. build?
 
-| Instead of… | This workflow does it | Value |
-|-------------|----------------------|-------|
-| Coding a document approval from scratch | AI extracts, validates, routes → human signs off in Teams | **$79** vs. days of dev time |
-| Triaging IT tickets manually | Agent classifies → escalating with SLA timers | **$49** vs. $800+/day consultant |
-| Onboarding each new hire line-by-line | Auto-creates accounts, tasks, knowledge handoff | **$79** vs. hours per new hire |
-| Drowning in shared inbox email | AI triages priority, files attachments, digests daily | **$29–$49** vs. missed messages |
-| Auditing docs against compliance rules | Validates, flags violations, tracks remediation | **$79–$99** vs. fine risk |
-| Guessing at AI token spend | Real-time dashboard + cost tracking + budget alerts | **$99** vs. surprise bills |
+| Instead of… | This workflow does it |
+|-------------|----------------------|
+| Coding a document approval from scratch | AI extracts, validates, routes → human signs off in Teams |
+| Triaging IT tickets manually | Agent classifies → escalating with SLA timers |
+| Onboarding each new hire line-by-line | Auto-creates accounts, tasks, knowledge handoff |
+| Drowning in shared inbox email | AI triages priority, files attachments, digests daily |
+| Auditing docs against compliance rules | Validates, flags violations, tracks remediation |
+| Guessing at AI token spend | Real-time dashboard + cost tracking + budget alerts |
 
 ### Workflow Catalog
 
-| # | Workflow | Price | Pairs With | Complexity |
-|---|----------|-------|------------|------------|
-| 1 | **Document Approval — AI Pre-check + Human Sign-off** | $79 | `legal-compliance-agent.yaml` | Advanced |
-| 2 | **IT Ticket Triage & Escalation** | $49 | `it-helpdesk-agent.yaml` | Mid |
-| 3 | **HR Onboarding Automation** | $79 | `onboarding-buddy-agent.yaml` + `hr-policy-agent.yaml` | Advanced |
-| 4 | **Email Triage & Daily Digest** | $29–$49 | All agents (standalone) | Standard |
-| 5 | **Compliance Document Validation** | $79–$99 | `legal-compliance-agent.yaml` | Advanced |
-| 6 | **AI Spend & Productivity Dashboard** | $99 | `agent-cost-intelligence` (nasyhub.com) | Advanced |
+| # | Workflow | Pairs With | Complexity |
+|---|----------|------------|------------|
+| 1 | **Document Approval — AI Pre-check + Human Sign-off** | `legal-compliance-agent.yaml` | Advanced |
+| 2 | **IT Ticket Triage & Escalation** | `it-helpdesk-agent.yaml` | Mid |
+| 3 | **HR Onboarding Automation** | `onboarding-buddy-agent.yaml` + `hr-policy-agent.yaml` | Advanced |
+| 4 | **Email Triage & Daily Digest** | All agents (standalone) | Standard |
+| 5 | **Compliance Document Validation** | `legal-compliance-agent.yaml` | Advanced |
+| 6 | **AI Spend & Productivity Dashboard** | `agent-cost-intelligence` (nasyhub.com) | Advanced |
 
 See full workflow catalog → [workflows/index.md](workflows/index.md) including bundles, pairing maps, and prerequisites.
 

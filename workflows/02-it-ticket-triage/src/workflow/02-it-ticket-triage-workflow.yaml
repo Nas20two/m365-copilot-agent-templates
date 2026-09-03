@@ -1,6 +1,5 @@
 # Microsoft Copilot Studio Workflow — IT Ticket Triage & Escalation
 # Template: cliagent-workflow-1.0.0
-# Price: $49 · Complexity: Mid · Connectors: Standard only
 # Pairs with: it-helpdesk-agent.yaml
 #
 # Import note: This YAML is an AgentSchema-aligned workflow specification.

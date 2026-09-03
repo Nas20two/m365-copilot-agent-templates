@@ -169,31 +169,26 @@ Aligned to: (a) proven demand, (b) differentiation vs free Microsoft templates a
    - Trigger: email/SharePoint file created, or agent conversation.
    - Logic: extract fields (vendor, amount, date) via AI prompt/classify node → validate against policy rules (If/Else thresholds) → AI approval stage → human RFI/approval for exceptions → Teams adaptive card + Outlook notification → audit log to SharePoint list.
    - Why: #1 category; directly leverages Copilot Studio AI approvals + RFI; enterprise-flag-ship.
-   - Price: $79 single / bundle anchor.
 
 2. **IT Helpdesk Ticket Triage & Escalation Workflow**
    - Trigger: email to helpdesk mailbox, Teams message, or agent conversation.
    - Logic: classify (LLM classify node: password/software/hardware/access) → severity If/Else → create/update ticket in SharePoint list or ServiceNow → SLA timer + escalation loop → status notifications in Teams → weekly summary flow (scheduled trigger).
    - Why: #4 category; pairs with our existing IT helpdesk agent template; high SMB+enterprise demand.
-   - Price: $49.
 
 3. **HR Onboarding Automation Workflow**
    - Trigger: new hire row added to SharePoint list / Form submission, or scheduled before start date.
    - Logic: welcome email (Outlook), Planner task creation (IT setup, equipment, buddy assignment), policy knowledge agent handoff, benefits Q&A, 30/60/90-day scheduled check-ins, completion dashboard to HR.
    - Why: #5 category; our onboarding agent template becomes the conversational layer; visible quick win for buyers.
-   - Price: $79 (multi-connector complexity).
 
 4. **Email Triage & Daily Digest Workflow**
    - Trigger: new email to shared inbox (event) + scheduled daily digest.
    - Logic: classify priority (AI), summarize long threads (prompt node), route urgent items to Teams channel + assignee, file attachments to SharePoint, end-of-day digest email with stats.
    - Why: #2 category; cheap to run (standard connectors), widest buyer pool; good loss-leader/free-tier candidate.
-   - Price: $29–$49.
 
 5. **Compliance Document Validation Workflow**
    - Trigger: document uploaded to compliance library (event) or agent conversation.
    - Logic: extract guidelines → validate document (Document Validation pattern) → categorize violations by risk (If/Else on severity) → human legal/compliance review stage → remediation task + audit trail → approved/flagged report to SharePoint.
    - Why: #6 category; EU AI Act urgency; our legal compliance agent template embeds as the Q&A layer; premium pricing justified by governance value.
-   - Price: $79–$99.
 
 **Sequencing:** Ship #4 first as a free/cheap proof (fast build, standard connectors), then #1 and #2 as paid anchors, then #3 and #5 for bundle depth. Package each as: solution .zip (unmanaged) + declarative agent YAML + docs + test data + setup video. Bundle tier: "Workflow Starter Pack" (4+5) $129; "Enterprise Workflow Library" (all 5 + future verticals) $249–$297 with quarterly updates — mirroring the proven Kesslernity price ceiling.
 

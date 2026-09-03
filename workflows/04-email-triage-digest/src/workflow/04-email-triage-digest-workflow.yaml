@@ -1,6 +1,5 @@
 # Microsoft Copilot Studio Workflow — Email Triage & Daily Digest
 # Template: cliagent-workflow-1.0.0
-# Price: $29–$49 · Complexity: Standard · Connectors: Standard only
 # Pairs with: any existing MD Copilot Agent (standalone, no agent dependency)
 #
 # Import note: This YAML is an AgentSchema-aligned workflow specification.

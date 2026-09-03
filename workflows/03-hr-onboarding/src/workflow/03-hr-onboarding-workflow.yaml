@@ -1,6 +1,5 @@
 # Microsoft Copilot Studio Workflow — HR Onboarding Automation
 # Template: cliagent-workflow-1.0.0
-# Price: $79 · Complexity: Advanced · Connectors: Standard only
 # Pairs with: onboarding-buddy-agent.yaml + hr-policy-agent.yaml
 #
 # Import note: This YAML is an AgentSchema-aligned workflow specification.
